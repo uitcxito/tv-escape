@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#f8f3eb">
+    <meta name="description" content="小电视大逃亡：躲开弹射的头像，连闯八关。">
+    <link rel="icon" type="image/svg+xml" href="./tv.svg">
+    <title>小电视大逃亡 · TV Escape</title>
+  </head>
+  <body>
+    <main class="cabinet" aria-labelledby="game-title">
+      <header class="hud" aria-label="游戏状态">
+        <div class="level">
+          <span class="level-number" id="level-number" aria-hidden="true">01</span>
+          <div class="level-copy">
+            <span class="eyebrow" id="level-count">第 1 / 8 关</span>
+            <strong id="level-title">试播现场</strong>
+            <div class="progress" id="progress" aria-hidden="true"></div>
+          </div>
+        </div>
+        <div class="roster">
+          <span class="eyebrow roster-label">追捕者</span>
+          <div class="roster-list" id="roster"></div>
+        </div>
+        <div class="controls">
+          <button class="control" id="pause" type="button" title="暂停 (Esc)" aria-label="暂停">
+            <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M9 5v14M15 5v14"/></svg>
+            <span id="pause-label">暂停</span><kbd>Esc</kbd>
+          </button>
+          <button class="control" id="mute" type="button" title="静音 (M)" aria-label="静音" aria-pressed="false">
+            <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 9v6h4l5 4V5L8 9z"/><path id="sound-waves" d="M16 9a4.5 4.5 0 0 1 0 6m2-8a7.5 7.5 0 0 1 0 10"/><path id="sound-cross" d="m17 10 4 4m0-4-4 4" style="display:none"/></svg>
+            <span id="mute-label">声音</span><kbd>M</kbd>
+          </button>
+        </div>
+      </header>
+
+      <div class="frame">
+        <div class="arena" id="arena">
+          <canvas id="map" aria-label="游戏地图：用 WASD 移动小电视，避开头像，进入绿色出口。" role="img"></canvas>
+          <div class="bubble" id="hint" role="status"></div>
+          <div class="feedback" id="feedback" aria-live="polite" hidden></div>
+          <button class="unlock" id="unlock" type="button" hidden>开启声音</button>
+          <div class="overlay" id="overlay" hidden>
+            <section class="result" aria-labelledby="result-title">
+              <div class="result-icon" id="result-icon" aria-hidden="true"></div>
+              <p class="eyebrow" id="result-kicker"></p>
+              <h2 id="result-title"></h2>
+              <p id="result-description"></p>
+              <button class="primary" id="result-action" type="button"></button>
+            </section>
+          </div>
+        </div>
+      </div>
+
+      <footer class="footer">
+        <div class="brand">
+          <img src="./tv.svg" alt="" width="43" height="43">
+          <div><div class="eyebrow">TV ESCAPE <span> / </span> 弹射追逐</div><h1 id="game-title">小电视大逃亡</h1></div>
+        </div>
+        <div class="footer-notes">
+          <div class="legend" aria-label="WASD 移动"><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd><span>移动</span></div>
+          <span class="audio-note" id="audio-note" hidden></span>
+          <a href="./portraits/credits.html" class="credits" target="_blank" rel="noopener">素材来源 <span aria-hidden="true">↗</span></a>
+        </div>
+      </footer>
+    </main>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

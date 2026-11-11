@@ -1,0 +1,7 @@
+node_modules/
+dist/
+.qa/
+__pycache__/
+*.local
+public/audio/*
+!public/audio/README.md
