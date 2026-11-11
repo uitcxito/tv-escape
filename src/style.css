@@ -65,6 +65,7 @@ button:focus-visible, a:focus-visible { outline: 3px solid #255bcc; outline-offs
   white-space: nowrap;
 }
 .control:hover, .unlock:hover { background: var(--pink); }
+.control.needs-activation kbd { display: none; }
 .control:active, .unlock:active, .primary:active { transform: translateY(2px); box-shadow: none; }
 .control svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 2.1; stroke-linecap: round; stroke-linejoin: round; }
 kbd { font: 700 10px/1 var(--mono); border: 1px solid #c9c0d2; border-bottom-width: 2px; border-radius: 4px; padding: 3px 4px; background: #fffdfc; }

@@ -34,17 +34,21 @@ let last = performance.now()
 let artTime = 0
 
 function updateSound() {
-  mute.setAttribute('aria-pressed', String(sound.muted))
-  mute.setAttribute('aria-label', sound.muted ? '取消静音' : '静音')
-  mute.title = sound.muted ? '取消静音 (M)' : '静音 (M)'
-  byId('mute-label').textContent = sound.muted ? '静音' : '声音'
+  const needsActivation = sound.needsActivation
+  const label = needsActivation ? '开启游戏声音' : sound.muted ? '取消静音' : '静音'
+  if (needsActivation) mute.removeAttribute('aria-pressed')
+  else mute.setAttribute('aria-pressed', String(sound.muted))
+  mute.setAttribute('aria-label', label)
+  mute.title = needsActivation ? label : `${label} (M)`
+  mute.classList.toggle('needs-activation', needsActivation)
+  byId('mute-label').textContent = needsActivation ? '开启声音' : sound.muted ? '静音' : '声音'
   byId('sound-waves').style.display = sound.muted ? 'none' : ''
   byId('sound-cross').style.display = sound.muted ? '' : 'none'
   const { music, hit } = sound.status
   unlock.hidden = !sound.blocked || sound.muted || (music === 'missing' && hit === 'missing') ||
     game.mode === 'won' || game.mode === 'paused'
   audioNote.textContent = music === 'missing' && hit === 'missing' ? '本地音频未加载'
-    : music === 'missing' ? '背景音乐未加载'
+    : music === 'missing' ? '《U Can’t Touch This》未加载'
     : hit === 'missing' ? '碰撞短句未加载' : ''
   audioNote.hidden = !audioNote.textContent
 }
@@ -139,7 +143,10 @@ function pauseForBlur() {
 }
 
 pause.addEventListener('click', () => { sound.enable(); togglePause() })
-mute.addEventListener('click', () => sound.toggleMute())
+mute.addEventListener('click', () => {
+  if (sound.needsActivation) sound.enable()
+  else sound.toggleMute()
+})
 unlock.addEventListener('click', () => sound.enable())
 action.addEventListener('click', () => {
   sound.enable()

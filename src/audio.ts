@@ -42,6 +42,11 @@ export class Sound {
     return { music, hit }
   }
 
+  get needsActivation() {
+    const { music, hit } = this.status
+    return !this.muted && this.context?.state !== 'running' && (music !== 'missing' || hit !== 'missing')
+  }
+
   private async preload() {
     let decoder: OfflineAudioContext
     try { decoder = new OfflineAudioContext(2, 1, 44100) }

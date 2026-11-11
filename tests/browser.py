@@ -279,8 +279,8 @@ def sound_and_retries(browser):
 def character_voices(browser):
     page, errors = open_game(browser, audio="voices")
     page.evaluate("audioProbe.deny = false")
-    page.get_by_role("button", name="暂停", exact=True).click()
-    page.get_by_role("button", name="继续游戏").click()
+    page.get_by_role("button", name="开启游戏声音").click()
+    expect(page.get_by_role("button", name="静音", exact=True)).to_have_attribute("aria-pressed", "false")
     fixtures = [
         (1, "catch", "zhang", "张一鸣：「不要让跳动停下来！」"),
         (3, "ma", "ma", "马云：「996！」"),
