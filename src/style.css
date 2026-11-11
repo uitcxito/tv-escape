@@ -25,7 +25,7 @@ body {
 button, a { -webkit-tap-highlight-color: transparent; }
 button { font: inherit; color: inherit; cursor: pointer; }
 button:focus-visible, a:focus-visible { outline: 3px solid #255bcc; outline-offset: 4px; }
-.cabinet { width: min(1216px, 100%, max(600px, (100svh - 180px) * 2)); }
+.cabinet { width: min(1216px, 100%, max(600px, (100svh - 180px) * 2)); container-type: inline-size; }
 .hud {
   min-height: 66px;
   display: grid;
@@ -50,8 +50,8 @@ button:focus-visible, a:focus-visible { outline: 3px solid #255bcc; outline-offs
 .progress .done { background: #67b785; }
 .progress .active { background: #6967cc; }
 .roster { display: flex; align-items: center; gap: 9px; }
-.roster-label { white-space: nowrap; }
-.roster-list { display: flex; gap: 5px; }
+.roster-label { display: grid; gap: 4px; white-space: nowrap; }
+.roster-list { display: flex; flex-wrap: wrap; gap: 5px; }
 .person {
   display: flex; gap: 5px; align-items: center; border: 1.5px solid var(--ink); border-radius: 999px;
   padding: 3px 8px 3px 3px; background: var(--tag); white-space: nowrap; font-size: 11px; font-weight: 800;
@@ -91,8 +91,9 @@ canvas { display: block; width: 100%; height: 100%; }
 .bubble[data-kind="exit"] { background: #e8ffed; }
 .feedback {
   position: absolute; bottom: 13px; left: 50%; transform: translateX(-50%); border: 1.5px solid var(--ink);
-  border-radius: 8px; padding: 6px 12px; color: var(--ink); background: #ffe5ed;
-  font-size: clamp(10px, 1.2vw, 13px); font-weight: 800; white-space: nowrap;
+  border-radius: 8px; padding: 6px 12px; color: var(--ink); background: var(--tag, #ffe5ed);
+  font-size: clamp(10px, 1.2vw, 13px); font-weight: 800; width: max-content; max-width: 90%; text-align: center;
+  pointer-events: none;
 }
 .unlock { position: absolute; bottom: 12px; right: 12px; }
 .overlay {
@@ -122,9 +123,14 @@ h1 { font-size: clamp(17px, 2.4vw, 26px); font-weight: 900; line-height: 1.1; le
 .legend span { margin-left: 3px; }
 .credits { color: inherit; text-underline-offset: 3px; white-space: nowrap; }
 .audio-note { color: #69576a; white-space: nowrap; }
-@media (max-width: 840px) {
+@container (max-width: 1060px) {
+  .hud.crowded { grid-template-columns: 1fr auto; }
+  .crowded .roster { order: 3; grid-column: 1 / -1; }
+}
+@container (max-width: 790px) {
   .hud { gap: 9px; }
   .control kbd, .roster-label { display: none; }
+  .crowded .roster-label { display: grid; }
   .level-number { width: 45px; height: 45px; font-size: 27px; }
   .level { gap: 8px; }
   .level-copy strong { font-size: 16px; }
@@ -133,7 +139,7 @@ h1 { font-size: clamp(17px, 2.4vw, 26px); font-weight: 900; line-height: 1.1; le
   body { place-items: start center; }
   .hud { grid-template-columns: 1fr auto; min-height: 0; }
   .roster { order: 3; grid-column: 1 / -1; }
-  .roster-label { display: inline; }
+  .roster-label { display: grid; }
   .frame { border-width: 2px; border-radius: 12px; padding: 4px; }
   .arena { border-radius: 6px; }
   .bubble { padding: 3px 5px; --offset: 16px; }

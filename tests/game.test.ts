@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { Game } from '../src/game'
-import { ENEMY_RADIUS, EXIT_RADIUS, LEVELS, PLAYER_RADIUS, PLAYER_SPEED, STEP } from '../src/levels'
+import { CAST, ENEMY_RADIUS, EXIT_RADIUS, LEVELS, PLAYER_RADIUS, PLAYER_SPEED, STEP } from '../src/levels'
 import { add, boardDistance, cast, dot, isClear, length, MAX_TURN, meet, move, rebound, sub, unit, v } from '../src/physics'
 import type { Arena, Board, Vec } from '../src/physics'
 
@@ -85,7 +85,7 @@ test('two simultaneous catches reset once, restore fixed spawns and velocities, 
   const reference = new Game([game.level])
   game.start()
   game.enemies = reference.enemies.map(e => ({ ...e, position: game.player, trail: [v(14, 13)] }))
-  assert.equal(game.tick(v()), 'catch')
+  assert.deepEqual(game.tick(v()), { type: 'catch', actor: 'zhang' })
   assert.equal(game.index, 3)
   assert.equal(game.attempts, 1)
   assert.equal(game.shield, 1)
@@ -99,8 +99,19 @@ test('two simultaneous catches reset once, restore fixed spawns and velocities, 
   assert.equal(game.protected, false)
   assert.equal(game.attempts, 1)
   for (const enemy of game.enemies) enemy.position = game.player
-  assert.equal(game.tick(v()), 'catch')
+  assert.deepEqual(game.tick(v()), { type: 'catch', actor: 'zhang' })
   assert.equal(game.attempts, 2)
+})
+
+test('the first actor to touch the player provides the collision cue, regardless of roster order', () => {
+  const game = new Game([{ ...LEVELS[0], ...empty, player: v(400, 400) }])
+  game.start()
+  game.enemies = [
+    { id: 'ma', position: v(453.5, 400), velocity: v(-240, 0), trail: [] },
+    { id: 'pony', position: v(347.25, 400), velocity: v(240, 0), trail: [] },
+  ]
+  assert.deepEqual(game.tick(v()), { type: 'catch', actor: 'pony' })
+  assert.equal(game.attempts, 1)
 })
 
 const cardinal = [v(0, 1), v(0, -1), v(1, 0), v(-1, 0)]
@@ -124,10 +135,9 @@ function reachable(arena: Arena, player: Vec, exit: Vec, permitted = (_p: Vec) =
 }
 
 test('all eight maps have safe spawns, reachable exits, and the requested difficulty curve', () => {
-  assert.deepEqual(LEVELS.map(l => l.speed), [140, 160, 180, 200, 225, 250, 275, 300])
-  assert.deepEqual(LEVELS.map(l => l.enemies.map(e => e.id).join('/')), [
-    'zhang', 'zhang', 'zhang/ma', 'zhang/ma', 'zhang/ma/liu', 'zhang/ma/liu', 'zhang/ma/liu', 'zhang/ma/liu',
-  ])
+  assert.deepEqual(LEVELS.map(l => l.speed), [140, 160, 180, 220, 260, 300, 345, 390])
+  assert.deepEqual(LEVELS.map(l => l.enemies.length), [1, 1, 2, 3, 4, 5, 7, 9])
+  assert.deepEqual(LEVELS[7].enemies.map(e => e.id), Object.keys(CAST))
   for (const [i, l] of LEVELS.entries()) {
     assert.ok(isClear(l.player, PLAYER_RADIUS, l), `stage ${i + 1} player spawn`)
     assert.ok(isClear(l.exit, EXIT_RADIUS, l), `stage ${i + 1} exit`)

@@ -12,7 +12,7 @@ const PALETTES = [
 ]
 const TAU = Math.PI * 2
 
-export const portraitURL = (id: CastId) => `${import.meta.env.BASE_URL}portraits/${CAST[id].file}`
+export const portraitURL = (id: CastId) => `${import.meta.env.BASE_URL}portraits/${id}.webp`
 
 function round(c: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number,
   fill: string | CanvasGradient, stroke?: string, thickness = 2) {
@@ -240,7 +240,7 @@ export class Renderer {
       if (img?.naturalWidth) c.drawImage(img, x - r, y - r, r * 2, r * 2)
       else {
         disc(c, x, y, r, info.light)
-        label(c, info.initial, x, y, 24, INK)
+        label(c, info.name[0], x, y, 24, INK)
       }
       c.restore()
       const tagX = Math.max(34, Math.min(w - 34, x))

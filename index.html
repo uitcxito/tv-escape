@@ -10,7 +10,7 @@
   </head>
   <body>
     <main class="cabinet" aria-labelledby="game-title">
-      <header class="hud" aria-label="游戏状态">
+      <header class="hud" id="hud" aria-label="游戏状态">
         <div class="level">
           <span class="level-number" id="level-number" aria-hidden="true">01</span>
           <div class="level-copy">
@@ -20,7 +20,7 @@
           </div>
         </div>
         <div class="roster">
-          <span class="eyebrow roster-label">追捕者</span>
+          <span class="eyebrow roster-label"><span id="roster-count">追捕者 · 1 人</span><span id="roster-speed">140 单位/秒</span></span>
           <div class="roster-list" id="roster"></div>
         </div>
         <div class="controls">

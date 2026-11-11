@@ -56,6 +56,9 @@ function updateLevel() {
   byId('level-number').textContent = String(game.index + 1).padStart(2, '0')
   byId('level-count').textContent = `第 ${game.index + 1} / ${LEVELS.length} 关`
   byId('level-title').textContent = game.level.title
+  byId('hud').classList.toggle('crowded', game.level.enemies.length > 4)
+  byId('roster-count').textContent = `追捕者 · ${game.level.enemies.length} 人`
+  byId('roster-speed').textContent = `${game.level.speed} 单位/秒`
   byId('progress').replaceChildren(...LEVELS.map((_, index) => {
     const el = document.createElement('span')
     if (index <= game.index) el.className = index === game.index && game.mode !== 'won' ? 'active' : 'done'
@@ -188,13 +191,15 @@ function frame(now: number) {
       impact = Math.max(0, impact - STEP * 2.5)
       toast = Math.max(0, toast - STEP)
       const event = game.tick(input)
-      if (event === 'catch') {
-        sound.caught()
+      if (event?.type === 'catch') {
+        const actor = CAST[event.actor]
+        sound.caught(event.actor)
         impact = 1
-        toast = 1
+        toast = 2.2
         feedback.hidden = false
-        feedback.textContent = `被追上了！重新出发 · ${game.attempts}`
-      } else if (event === 'advance' || event === 'win') {
+        feedback.style.setProperty('--tag', actor.light)
+        feedback.textContent = `${actor.name}：「${actor.line}」 · 重新出发 · ${game.attempts}`
+      } else if (event) {
         impact = toast = 0
       }
     }

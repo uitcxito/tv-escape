@@ -1,3 +1,6 @@
+import { CAST } from './levels'
+import type { CastId } from './levels'
+
 const AUDIO = {
   music: 'audio/music.mp3',
   hit: 'audio/hit.mp3',
@@ -6,13 +9,18 @@ const AUDIO = {
   voiceVolume: .95,
 } as const
 
-type Track = 'music' | 'hit'
-export type Availability = 'loading' | 'ready' | 'missing'
+type Track = 'music' | 'hit' | CastId
+type Availability = 'loading' | 'ready' | 'missing'
+const TRACKS: readonly (readonly [Track, string])[] = [
+  ['music', AUDIO.music],
+  ['hit', AUDIO.hit],
+  ...(Object.keys(CAST) as CastId[]).map(id => [id, `voices/${id}.wav`] as const),
+]
 
 export class Sound {
   muted = false
   blocked = false
-  status: Record<Track, Availability> = { music: 'loading', hit: 'loading' }
+  private availability = new Map<Track, Availability>(TRACKS.map(([track]) => [track, 'loading']))
   private buffers: Partial<Record<Track, AudioBuffer>> = {}
   private context?: AudioContext
   private master?: GainNode
@@ -26,26 +34,34 @@ export class Sound {
     void this.preload()
   }
 
+  get status() {
+    const music = this.availability.get('music') ?? 'missing'
+    const voices = TRACKS.filter(([track]) => track !== 'music')
+    const hit = voices.some(([track]) => this.availability.get(track) === 'ready') ? 'ready'
+      : voices.some(([track]) => this.availability.get(track) === 'loading') ? 'loading' : 'missing'
+    return { music, hit }
+  }
+
   private async preload() {
     let decoder: OfflineAudioContext
     try { decoder = new OfflineAudioContext(2, 1, 44100) }
     catch {
-      this.status = { music: 'missing', hit: 'missing' }
+      this.availability.clear()
       this.changed()
       return
     }
-    await Promise.all((['music', 'hit'] as const).map(async track => {
+    await Promise.all(TRACKS.map(async ([track, path]) => {
       try {
-        const url = new URL(import.meta.env.BASE_URL + AUDIO[track], document.baseURI)
+        const url = new URL(import.meta.env.BASE_URL + path, document.baseURI)
         const response = await fetch(url, { signal: AbortSignal.timeout(12000) })
         if (!response.ok || response.headers.get('Content-Type')?.includes('text/html')) {
           throw new Error('Audio asset missing')
         }
         const data = await response.arrayBuffer()
         this.buffers[track] = await decoder.decodeAudioData(data)
-        this.status[track] = 'ready'
-        this.startMusic()
-      } catch { this.status[track] = 'missing' }
+        this.availability.set(track, 'ready')
+        if (track === 'music') this.startMusic()
+      } catch { this.availability.set(track, 'missing') }
       this.changed()
     }))
   }
@@ -121,9 +137,10 @@ export class Sound {
     gain.linearRampToValueAtTime(value, time + duration)
   }
 
-  caught() {
+  caught(actor: CastId) {
     const ctx = this.context
-    if (ctx?.state !== 'running' || !this.buffers.hit || !this.master || this.muted) return
+    const buffer = this.buffers[actor] ?? this.buffers.hit
+    if (ctx?.state !== 'running' || !buffer || !this.master || this.muted) return
     if (this.voice) {
       this.voice.stop()
       this.voice.disconnect()
@@ -132,7 +149,7 @@ export class Sound {
     const source = ctx.createBufferSource()
     const gain = ctx.createGain()
     gain.gain.value = AUDIO.voiceVolume
-    source.buffer = this.buffers.hit
+    source.buffer = buffer
     source.connect(gain).connect(this.master)
     source.onended = () => {
       source.disconnect()

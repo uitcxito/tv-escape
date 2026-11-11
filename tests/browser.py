@@ -97,13 +97,16 @@ def open_game(browser, audio=None):
     page.on("pageerror", lambda error: errors.append(str(error)))
     if audio:
         page.add_init_script(AUDIO_PROBE)
+    if audio == "signals":
         signals = {"music": wav(440, .2), "hit": wav(990, 1.4)}
         for track, payload in signals.items():
             page.route(f"**/audio/{track}.mp3",
                        lambda route, _request=None, body=payload: route.fulfill(body=body, content_type="audio/wav"))
-    else:
+    if audio is None:
         page.route("**/audio/music.mp3", lambda route: route.fulfill(status=404, body="missing"))
         page.route("**/audio/hit.mp3", lambda route: route.fulfill(body="corrupt", content_type="audio/mpeg"))
+    if audio != "voices":
+        page.route("**/voices/*.wav", lambda route: route.fulfill(status=404, body="missing"))
     page.goto(BASE)
     page.wait_for_load_state("networkidle")
     frames(page, 1)
@@ -162,8 +165,17 @@ def playthrough(browser):
     for i, route in enumerate(ROUTES["stages"], 1):
         stage(page, i)
         roster = page.locator("#roster img")
-        expect(roster).to_have_count([1, 1, 2, 2, 3, 3, 3, 3][i - 1])
-        page.wait_for_function("Array.from(document.querySelectorAll('#roster img')).every(i => i.naturalWidth > 0)")
+        expect(roster).to_have_count([1, 1, 2, 3, 4, 5, 7, 9][i - 1])
+        page.wait_for_function("Array.from(document.querySelectorAll('#roster img')).every(i => i.naturalWidth > 0)",
+                               polling=25)
+        if i == 8:
+            expect(page.locator("#roster-count")).to_have_text("追捕者 · 9 人")
+            expect(page.locator("#roster-speed")).to_have_text("390 单位/秒")
+            if os.environ.get("GAME_QA_DIR"):
+                page.screenshot(path=str(Path(os.environ["GAME_QA_DIR"]) / "stage-8.png"))
+            page.set_viewport_size({"width": 1100, "height": 600})
+            assert page.evaluate("document.querySelector('#hud').scrollWidth === document.querySelector('#hud').clientWidth")
+            page.set_viewport_size({"width": 1440, "height": 900})
         if i == 1:
             page.keyboard.down("d")
             frames(page, 1)
@@ -230,7 +242,7 @@ def pause_and_resize(browser):
 
 
 def sound_and_retries(browser):
-    page, errors = open_game(browser, audio=True)
+    page, errors = open_game(browser, audio="signals")
     page.keyboard.down("s")
     page.keyboard.down("d")
     expect(page.get_by_role("button", name="开启声音")).to_be_visible()
@@ -264,6 +276,35 @@ def sound_and_retries(browser):
     print("Browser: denied audio activation/retry, repeated catches, loop, duck, voice replacement, restore and mute")
 
 
+def character_voices(browser):
+    page, errors = open_game(browser, audio="voices")
+    page.evaluate("audioProbe.deny = false")
+    page.get_by_role("button", name="暂停", exact=True).click()
+    page.get_by_role("button", name="继续游戏").click()
+    fixtures = [
+        (1, "catch", "zhang", "张一鸣：「不要让跳动停下来！」"),
+        (3, "ma", "ma", "马云：「996！」"),
+        (5, "pony", "pony", "马化腾：「你要不要 Q 币呀？」"),
+    ]
+    current_stage = 1
+    for n, (level, route, actor, caption) in enumerate(fixtures, 1):
+        while current_stage < level:
+            drive(page, ROUTES["stages"][current_stage - 1])
+            current_stage += 1
+            stage(page, current_stage)
+        drive(page, ROUTES[route])
+        expect(page.locator("#feedback")).to_contain_text(caption)
+        page.wait_for_function("n => audioProbe.starts.filter(s => !s.loop).length === n", arg=n, polling=25)
+        path = Path(__file__).parents[1] / "public" / "voices" / f"{actor}.wav"
+        with wave.open(str(path), "rb") as file:
+            expected = file.getnframes() / file.getframerate()
+        actual = page.evaluate("audioProbe.starts.filter(s => !s.loop).at(-1).duration")
+        assert abs(actual - expected) < .002, (actor, actual, expected)
+    assert not errors, errors
+    page.close()
+    print("Browser: each requested collision selects its own packaged voice and matching caption")
+
+
 if __name__ == "__main__":
     with sync_playwright() as playwright:
         browser = playwright.chromium.launch(
@@ -273,5 +314,6 @@ if __name__ == "__main__":
             playthrough(browser)
             pause_and_resize(browser)
             sound_and_retries(browser)
+            character_voices(browser)
         finally:
             browser.close()

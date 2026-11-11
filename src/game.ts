@@ -3,7 +3,7 @@ import type { CastId, Level } from './levels'
 import { add, length, meet, move, mul, sub, unit, v } from './physics'
 import type { Span, Vec } from './physics'
 
-export type GameEvent = 'catch' | 'advance' | 'win'
+export type GameEvent = { type: 'catch'; actor: CastId } | { type: 'advance' | 'win' }
 export type Mode = 'ready' | 'running' | 'paused' | 'won'
 export type Hint = 'move' | 'dodge' | 'exit' | null
 export interface Enemy { id: CastId; position: Vec; velocity: Vec; trail: Vec[] }
@@ -82,14 +82,21 @@ export class Game {
       const from = add(s.from, mul(sub(s.to, s.from), (active - s.start) / (s.end - s.start)))
       return [{ ...s, from, start: active }]
     }) : []
-    const catches = enemies.map(e => meet(vulnerable, e.path, PLAYER_RADIUS + ENEMY_RADIUS))
-    const caught = Math.min(...catches)
-    if (caught <= dt && caught <= escape) {
+    let caughtAt = Infinity
+    let caughtBy: CastId | undefined
+    for (const [i, enemy] of enemies.entries()) {
+      const time = meet(vulnerable, enemy.path, PLAYER_RADIUS + ENEMY_RADIUS)
+      if (time < caughtAt) {
+        caughtAt = time
+        caughtBy = this.enemies[i].id
+      }
+    }
+    if (caughtBy && caughtAt <= dt && caughtAt <= escape) {
       this.attempts++
       this.lastCaught = player.position
       this.load()
       this.shield = 1
-      return 'catch'
+      return { type: 'catch', actor: caughtBy }
     }
     if (escape <= dt) {
       this.hint = null
@@ -97,13 +104,13 @@ export class Game {
         this.player = player.position
         this.moving = false
         this.mode = 'won'
-        return 'win'
+        return { type: 'win' }
       }
       this.index++
       this.shield = 0
       this.lastCaught = null
       this.load()
-      return 'advance'
+      return { type: 'advance' }
     }
 
     this.moving = length(sub(this.player, player.position)) > 0.1
