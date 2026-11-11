@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { Game } from '../src/game'
-import { CAST, ENEMY_RADIUS, EXIT_RADIUS, LEVELS, PLAYER_RADIUS, PLAYER_SPEED, STEP } from '../src/levels'
+import { Game, MAX_CHARGES } from '../src/game'
+import { BATTERY_RADIUS, CAST, ENEMY_RADIUS, EXIT_RADIUS, LEVELS, PLAYER_RADIUS, PLAYER_SPEED, STEP } from '../src/levels'
 import { add, boardDistance, cast, dot, isClear, length, MAX_TURN, meet, move, rebound, sub, unit, v } from '../src/physics'
 import type { Arena, Board, Vec } from '../src/physics'
 
@@ -84,7 +84,7 @@ test('two simultaneous catches reset once, restore fixed spawns and velocities, 
   game.index = 3
   const reference = new Game([game.level])
   game.start()
-  game.enemies = reference.enemies.map(e => ({ ...e, position: game.player, trail: [v(14, 13)] }))
+  game.enemies = reference.enemies.map(e => ({ ...e, position: game.player, delay: 0, trail: [v(14, 13)] }))
   assert.deepEqual(game.tick(v()), { type: 'catch', actor: 'zhang' })
   assert.equal(game.index, 3)
   assert.equal(game.attempts, 1)
@@ -107,11 +107,91 @@ test('the first actor to touch the player provides the collision cue, regardless
   const game = new Game([{ ...LEVELS[0], ...empty, player: v(400, 400) }])
   game.start()
   game.enemies = [
-    { id: 'ma', position: v(453.5, 400), velocity: v(-240, 0), trail: [] },
-    { id: 'pony', position: v(347.25, 400), velocity: v(240, 0), trail: [] },
+    { id: 'ma', position: v(453.5, 400), velocity: v(-240, 0), trail: [], delay: 0, disrupted: 0 },
+    { id: 'pony', position: v(347.25, 400), velocity: v(240, 0), trail: [], delay: 0, disrupted: 0 },
   ]
   assert.deepEqual(game.tick(v()), { type: 'catch', actor: 'pony' })
   assert.equal(game.attempts, 1)
+})
+
+test('a pulse spends one charge, repels a nearby chaser, and gives temporary protection', () => {
+  const game = new Game([{ ...LEVELS[0], ...empty, player: v(400, 400), enemies: [] }])
+  assert.equal(game.releasePulse(), undefined)
+  game.start()
+  game.enemies = [
+    { id: 'zhang', position: v(450, 400), velocity: v(-140, 0), trail: [], delay: 0, disrupted: 0 },
+    { id: 'ma', position: v(600, 400), velocity: v(140, 0), trail: [], delay: 0, disrupted: 0 },
+  ]
+  assert.equal(game.releasePulse(), 1)
+  assert.equal(game.charge, 0)
+  assert.equal(game.pulseHits, 1)
+  assert.equal(game.releasePulse(), undefined)
+  assert.ok(game.protected)
+  const enemy = game.enemies[0]
+  assert.ok(enemy.velocity.x > 0)
+  assert.ok(enemy.disrupted > 0)
+  assert.equal(game.enemies[1].disrupted, 0)
+  for (let i = 0; i < 90; i++) assert.equal(game.tick(v()), undefined)
+  assert.ok(enemy.position.x > 450)
+  assert.equal(game.protected, false)
+  assert.ok(enemy.disrupted > 0)
+  enemy.position = game.player
+  assert.equal(game.tick(v()), undefined, 'a disrupted chaser is harmless even after the shield ends')
+  enemy.position = v(500, 400)
+  for (let i = 0; i < 45; i++) game.tick(v())
+  assert.equal(enemy.disrupted, 0)
+  close(length(enemy.velocity), game.level.speed)
+  enemy.position = game.player
+  assert.deepEqual(game.tick(v()), { type: 'catch', actor: 'zhang' })
+  assert.equal(game.charge, 1, 'a retry restores a pulse if none remain')
+})
+
+test('collecting batteries is optional, caps charges, and keeps credit when a player retries', () => {
+  const game = new Game([{
+    ...LEVELS[0], ...empty, player: v(400, 400), exit: v(660, 400),
+    enemies: [], batteries: [v(440, 400), v(550, 400)],
+  }])
+  game.start()
+  assert.deepEqual(game.tick(v(1, 0)), { type: 'pickup', charged: true })
+  assert.equal(game.charge, 2)
+  game.enemies = [
+    { id: 'zhang', position: game.player, velocity: v(-140, 0), trail: [], delay: 0, disrupted: 0 },
+  ]
+  assert.deepEqual(game.tick(v()), { type: 'catch', actor: 'zhang' })
+  assert.equal(game.batteriesFound, 1)
+  assert.equal(game.charge, 2)
+  assert.equal(game.tick(v(1, 0)), undefined, 'a battery collected earlier stays collected')
+  game.charge = MAX_CHARGES
+  game.player = v(515, 400)
+  assert.deepEqual(game.tick(v()), { type: 'pickup', charged: false })
+  assert.equal(game.batteriesFound, 2)
+  assert.equal(game.charge, MAX_CHARGES)
+  game.restart()
+  assert.equal(game.batteriesFound, 0)
+  assert.equal(game.charge, 1)
+  assert.equal(game.takenBatteries.size, 0)
+  game.start()
+  game.player = v(630, 400)
+  assert.deepEqual(game.tick(v()), { type: 'win' }, 'the exit opens with zero batteries collected')
+})
+
+test('staggered chasers wait through the start and the finale allows a straight opening', () => {
+  const game = new Game([LEVELS[7]])
+  game.start()
+  assert.equal(game.charge, 2)
+  const delayed = game.enemies.find(enemy => enemy.id === 'chen')!
+  const initial = delayed.position
+  for (let i = 0; i < 36; i++) assert.notEqual(game.tick(v(1, 0))?.type, 'catch')
+  assert.deepEqual(delayed.position, initial)
+  assert.ok(game.player.x > 190)
+
+  const demo = new Game([{ ...LEVELS[0], ...empty, player: v(400, 400), batteries: [], enemies: [] }])
+  demo.start()
+  demo.enemies = [
+    { id: 'chen', position: demo.player, velocity: v(140, 0), trail: [], delay: .2, disrupted: 0 },
+  ]
+  for (let i = 0; i < 24; i++) assert.equal(demo.tick(v()), undefined)
+  assert.deepEqual(demo.tick(v()), { type: 'catch', actor: 'chen' })
 })
 
 const cardinal = [v(0, 1), v(0, -1), v(1, 0), v(-1, 0)]
@@ -134,8 +214,8 @@ function reachable(arena: Arena, player: Vec, exit: Vec, permitted = (_p: Vec) =
   return false
 }
 
-test('all eight maps have safe spawns, reachable exits, and the requested difficulty curve', () => {
-  assert.deepEqual(LEVELS.map(l => l.speed), [140, 160, 180, 220, 260, 300, 345, 390])
+test('all eight maps have safe spawns and reachable exits and batteries', () => {
+  assert.deepEqual(LEVELS.map(l => l.speed), [140, 160, 180, 185, 195, 208, 220, 232])
   assert.deepEqual(LEVELS.map(l => l.enemies.length), [1, 1, 2, 3, 4, 5, 7, 9])
   assert.deepEqual(LEVELS[7].enemies.map(e => e.id), Object.keys(CAST))
   for (const [i, l] of LEVELS.entries()) {
@@ -147,7 +227,12 @@ test('all eight maps have safe spawns, reachable exits, and the requested diffic
       for (const other of l.enemies.slice(j + 1)) assert.ok(length(sub(e.position, other.position)) > ENEMY_RADIUS * 2)
     })
     assert.ok(reachable(l, l.player, l.exit), `stage ${i + 1} exit is reachable`)
+    l.batteries.forEach((battery, j) => {
+      assert.ok(isClear(battery, BATTERY_RADIUS, l), `stage ${i + 1} battery ${j + 1} is on open floor`)
+      assert.ok(reachable(l, l.player, battery), `stage ${i + 1} battery ${j + 1} is reachable`)
+    })
   }
+  assert.equal(cast(v(285, 296), v(551, 0), PLAYER_RADIUS, LEVELS[4]), undefined, 'stage 5 has a shortcut')
   const l = LEVELS[6]
   assert.ok(reachable(l, l.player, l.exit, p => p.y <= l.player.y))
   assert.ok(reachable(l, l.player, l.exit, p => p.y >= l.player.y))

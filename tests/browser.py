@@ -5,6 +5,7 @@ import json
 import math
 import os
 from pathlib import Path
+import re
 import wave
 
 from playwright.sync_api import expect, sync_playwright
@@ -31,7 +32,7 @@ CLOCK = """
 AUDIO_PROBE = """
 (() => {
   const Audio = window.AudioContext;
-  window.audioProbe = { starts: [], stops: [], spectrum: () => null, deny: true };
+  window.audioProbe = { starts: [], stops: [], effects: 0, spectrum: () => null, deny: true };
   window.AudioContext = class extends Audio {
     get state() { return audioProbe.deny ? 'suspended' : super.state }
     resume() {
@@ -50,6 +51,12 @@ AUDIO_PROBE = """
         return stop(...args);
       };
       return source;
+    }
+    createOscillator() {
+      const tone = super.createOscillator();
+      const start = tone.start.bind(tone);
+      tone.start = (...args) => { audioProbe.effects++; return start(...args) };
+      return tone;
     }
     createGain() {
       const gain = super.createGain(), connect = gain.connect.bind(gain);
@@ -162,6 +169,12 @@ def playthrough(browser):
     expect(page.get_by_role("heading", name="游戏暂停")).to_be_visible()
     page.get_by_role("button", name="继续游戏").click()
     expect(page.locator("#hint")).to_have_text("WASD 移动")
+    page.locator("#feedback").evaluate("""node => {
+      window.catches = 0;
+      new MutationObserver(() => {
+        if (node.textContent.includes('重新出发')) window.catches++;
+      }).observe(node, { childList: true, characterData: true, subtree: true });
+    }""")
     for i, route in enumerate(ROUTES["stages"], 1):
         stage(page, i)
         roster = page.locator("#roster img")
@@ -170,7 +183,7 @@ def playthrough(browser):
                                polling=25)
         if i == 8:
             expect(page.locator("#roster-count")).to_have_text("追捕者 · 9 人")
-            expect(page.locator("#roster-speed")).to_have_text("390 单位/秒")
+            expect(page.locator("#roster-speed")).to_have_text("232 单位/秒")
             if os.environ.get("GAME_QA_DIR"):
                 page.screenshot(path=str(Path(os.environ["GAME_QA_DIR"]) / "stage-8.png"))
             page.set_viewport_size({"width": 1100, "height": 600})
@@ -187,10 +200,14 @@ def playthrough(browser):
             drive(page, route[3:])
         else:
             drive(page, route)
-        expect(page.locator("#hint")).to_be_hidden()
+        if i == 1:
+            expect(page.locator("#hint")).to_contain_text("释放干扰")
+        else:
+            expect(page.locator("#hint")).to_be_hidden()
 
     expect(page.get_by_role("heading", name="成功逃出！")).to_be_visible()
-    expect(page.locator("#result-description")).to_have_text("八关全部完成 · 被追上 0 次")
+    expect(page.locator("#result-description")).to_have_text(re.compile(r"八关全部完成 · 电池 \d+ / 15"))
+    assert page.evaluate("window.catches") == 0
     if os.environ.get("GAME_QA_DIR"):
         page.screenshot(path=str(Path(os.environ["GAME_QA_DIR"]) / "win.png"))
     page.get_by_role("button", name="再玩一次").click()
@@ -276,6 +293,34 @@ def sound_and_retries(browser):
     print("Browser: denied audio activation/retry, repeated catches, loop, duck, voice replacement, restore and mute")
 
 
+def batteries_and_pulse(browser):
+    page, errors = open_game(browser, audio="voices")
+    page.evaluate("audioProbe.deny = false")
+    page.get_by_role("button", name="开启游戏声音").click()
+    pulse = page.get_by_role("button", name="干扰脉冲（空格）")
+    expect(pulse).to_have_attribute("aria-disabled", "true")
+    drive(page, [("D", 90)])
+    expect(page.locator("#power-count")).to_have_text("剩余 2 次")
+    expect(page.locator("#feedback")).to_contain_text("电池 +1")
+    assert page.evaluate("audioProbe.effects") == 3
+    drive(page, [("SD", 96)])
+    page.keyboard.press("Space")
+    expect(page.locator("#feedback")).to_have_text("干扰命中 1 名 · 快溜！")
+    expect(page.locator("#power-count")).to_have_text("剩余 1 次")
+    assert page.evaluate("audioProbe.effects") == 5
+    page.keyboard.press("Space")
+    expect(page.locator("#power-count")).to_have_text("剩余 1 次")
+    drive(page, [("D", 72)])
+    expect(page.locator("#feedback")).to_contain_text("快溜")
+    pulse.click()
+    expect(page.locator("#power-count")).to_have_text("剩余 0 次")
+    expect(pulse).to_have_attribute("aria-disabled", "true")
+    assert page.evaluate("audioProbe.effects") == 7
+    assert not errors, errors
+    page.close()
+    print("Browser: collected a battery, pushed away a chaser with Space, escaped, and used the pulse control")
+
+
 def character_voices(browser):
     page, errors = open_game(browser, audio="voices")
     page.evaluate("audioProbe.deny = false")
@@ -314,6 +359,7 @@ if __name__ == "__main__":
             playthrough(browser)
             pause_and_resize(browser)
             sound_and_retries(browser)
+            batteries_and_pulse(browser)
             character_voices(browser)
         finally:
             browser.close()

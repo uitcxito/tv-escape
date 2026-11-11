@@ -91,7 +91,7 @@ function slide(velocity: Vec, normals: Vec[]) {
   return options.reduce((a, b) => length(sub(a, velocity)) < length(sub(b, velocity)) ? a : b)
 }
 
-export function rebound(velocity: Vec, normals: Vec[], toward: Vec): Vec {
+export function rebound(velocity: Vec, normals: Vec[], toward?: Vec): Vec {
   const speed = length(velocity)
   const incoming = unit(velocity)
   let out = incoming
@@ -101,6 +101,7 @@ export function rebound(velocity: Vec, normals: Vec[], toward: Vec): Vec {
   const pointsOut = (p: Vec) => normals.every(n => dot(p, n) > 0)
   // At an acute corner, sequential reflections can point back into a face.
   if (!pointsOut(out)) out = mul(incoming, -1)
+  if (!toward) return mul(out, speed)
   const cross = out.x * toward.y - out.y * toward.x
   let angle = clamp(Math.atan2(cross, dot(out, toward)), -MAX_TURN, MAX_TURN)
   for (let i = 0; i < 24; i++, angle *= .5) {
@@ -114,7 +115,8 @@ export function rebound(velocity: Vec, normals: Vec[], toward: Vec): Vec {
 export interface Span { from: Vec; to: Vec; start: number; end: number }
 export interface Motion { position: Vec; velocity: Vec; path: Span[]; bounces: number }
 
-export function move(start: Vec, velocity: Vec, dt: number, radius: number, arena: Arena, target?: Vec): Motion {
+// Omit the target to slide, pass null to bounce without steering.
+export function move(start: Vec, velocity: Vec, dt: number, radius: number, arena: Arena, target?: Vec | null): Motion {
   let position = start
   let elapsed = 0
   let bounces = 0
@@ -131,8 +133,8 @@ export function move(start: Vec, velocity: Vec, dt: number, radius: number, aren
     if (!hit) break
     const separated = add(position, mul(unit(hit.normals.reduce(add, v())), SKIN))
     if (isClear(separated, radius, arena)) position = separated
-    if (target) {
-      velocity = rebound(velocity, hit.normals, sub(target, position))
+    if (target !== undefined) {
+      velocity = rebound(velocity, hit.normals, target ? sub(target, position) : undefined)
       bounces++
     } else velocity = slide(velocity, hit.normals)
   }

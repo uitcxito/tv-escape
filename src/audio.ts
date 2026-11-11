@@ -17,6 +17,12 @@ const TRACKS: readonly (readonly [Track, string])[] = [
   ...(Object.keys(CAST) as CastId[]).map(id => [id, `voices/${id}.wav`] as const),
 ]
 
+const EFFECTS = {
+  pickup: [620, 880, 1175],
+  pulse: [255, 410],
+  clear: [523, 659, 784, 1047],
+} as const
+
 export class Sound {
   muted = false
   blocked = false
@@ -43,8 +49,7 @@ export class Sound {
   }
 
   get needsActivation() {
-    const { music, hit } = this.status
-    return !this.muted && this.context?.state !== 'running' && (music !== 'missing' || hit !== 'missing')
+    return !this.muted && this.context?.state !== 'running'
   }
 
   private async preload() {
@@ -72,7 +77,6 @@ export class Sound {
   }
 
   enable() {
-    if (Object.values(this.status).every(s => s === 'missing')) return
     try {
       if (!this.context) {
         const ctx = new AudioContext()
@@ -117,6 +121,29 @@ export class Sound {
     if (this.master && this.context) this.master.gain.setValueAtTime(this.muted ? 0 : 1, this.context.currentTime)
     if (!this.muted) this.enable()
     this.changed()
+  }
+
+  effect(kind: keyof typeof EFFECTS) {
+    const ctx = this.context
+    if (ctx?.state !== 'running' || !this.master || this.muted) return
+    const output = this.master
+    const time = ctx.currentTime
+    const duration = kind === 'pulse' ? .20 : .12
+    EFFECTS[kind].forEach((frequency, i) => {
+      const start = time + i * .058
+      const tone = ctx.createOscillator()
+      const volume = ctx.createGain()
+      tone.type = 'triangle'
+      tone.frequency.setValueAtTime(frequency, start)
+      if (kind === 'pulse') tone.frequency.exponentialRampToValueAtTime(frequency * .42, start + duration)
+      volume.gain.setValueAtTime(0, start)
+      volume.gain.linearRampToValueAtTime(.065, start + .009)
+      volume.gain.exponentialRampToValueAtTime(.001, start + duration)
+      tone.connect(volume).connect(output)
+      tone.onended = () => { tone.disconnect(); volume.disconnect() }
+      tone.start(start)
+      tone.stop(start + duration)
+    })
   }
 
   private startMusic() {

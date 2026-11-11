@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="theme-color" content="#f8f3eb">
-    <meta name="description" content="小电视大逃亡：躲开弹射的头像，连闯八关。">
+    <meta name="description" content="小电视大逃亡：捡起电池、释放干扰，躲开弹射的头像，连闯八关。">
     <link rel="icon" type="image/svg+xml" href="./tv.svg">
     <title>小电视大逃亡 · TV Escape</title>
   </head>
@@ -37,7 +37,7 @@
 
       <div class="frame">
         <div class="arena" id="arena">
-          <canvas id="map" aria-label="游戏地图：用 WASD 移动小电视，避开头像，进入绿色出口。" role="img"></canvas>
+          <canvas id="map" aria-label="游戏地图。WASD 移动，空格干扰追捕者，进入绿色出口。" role="img"></canvas>
           <div class="bubble" id="hint" role="status"></div>
           <div class="feedback" id="feedback" aria-live="polite" hidden></div>
           <button class="unlock" id="unlock" type="button" hidden>开启声音</button>
@@ -58,6 +58,13 @@
           <img src="./tv.svg" alt="" width="43" height="43">
           <div><div class="eyebrow">TV ESCAPE <span> / </span> 弹射追逐</div><h1 id="game-title">小电视大逃亡</h1></div>
         </div>
+        <button class="power" id="pulse" type="button" aria-label="干扰脉冲（空格）" aria-disabled="true" aria-keyshortcuts="Space"
+          aria-describedby="power-count" title="击退附近的追捕者并短暂保护小电视">
+          <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M13 2 5 13h6l-1 9 9-12h-7z"/></svg>
+          <span>干扰脉冲</span><kbd>空格</kbd>
+          <span class="power-cells" id="power-cells" aria-hidden="true"></span>
+          <span class="sr-only" id="power-count"></span>
+        </button>
         <div class="footer-notes">
           <div class="legend" aria-label="WASD 移动"><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd><span>移动</span></div>
           <span class="audio-note" id="audio-note" hidden></span>

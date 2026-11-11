@@ -90,8 +90,10 @@ canvas { display: block; width: 100%; height: 100%; }
 .bubble kbd { background: #e3eaff; border-color: #b7bbd3; display: inline-block; min-width: 17px; margin-right: 2px; }
 .bubble[data-kind="dodge"] { background: #ffe9ee; }
 .bubble[data-kind="exit"] { background: #e8ffed; }
+.bubble[data-kind="pulse"] { background: #fff1b9; transform: translate(-50%, var(--offset, 31px)); }
+.bubble[data-kind="pulse"]::after { top: -6px; bottom: auto; transform: rotate(225deg); }
 .feedback {
-  position: absolute; bottom: 13px; left: 50%; transform: translateX(-50%); border: 1.5px solid var(--ink);
+  position: absolute; top: 13px; left: 50%; transform: translateX(-50%); border: 1.5px solid var(--ink);
   border-radius: 8px; padding: 6px 12px; color: var(--ink); background: var(--tag, #ffe5ed);
   font-size: clamp(10px, 1.2vw, 13px); font-weight: 800; width: max-content; max-width: 90%; text-align: center;
   pointer-events: none;
@@ -119,6 +121,23 @@ canvas { display: block; width: 100%; height: 100%; }
 .brand .eyebrow { letter-spacing: .17em; }
 .brand .eyebrow span { color: #b13f68; }
 h1 { font-size: clamp(17px, 2.4vw, 26px); font-weight: 900; line-height: 1.1; letter-spacing: .065em; margin: 4px 0 0; }
+.power {
+  flex: 0 0 auto; display: inline-flex; align-items: center; gap: 7px; padding: 8px 10px;
+  background: #fff1b9; border: 1.5px solid var(--ink); border-radius: 9px; box-shadow: 0 2px var(--ink);
+  font-size: 12px; font-weight: 850; white-space: nowrap;
+}
+.power:not([aria-disabled="true"]):hover { background: #ffe18b; }
+.power:not([aria-disabled="true"]):active { transform: translateY(2px); box-shadow: none; }
+.power[aria-disabled="true"] { background: #f9f2e1; cursor: default; }
+.power svg { width: 17px; height: 17px; fill: #f8bd50; stroke: var(--ink); stroke-width: 1.65; stroke-linejoin: round; }
+.power kbd { font: inherit; font-size: 10px; }
+.power-cells { display: flex; gap: 3px; margin-left: 3px; }
+.power-cells span { width: 8px; height: 13px; border: 1.25px solid #837862; border-radius: 2px; }
+.power-cells .charged { background: #ffcb59; border-color: #715526; }
+.sr-only {
+  position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden;
+  clip-path: inset(50%); white-space: nowrap;
+}
 .footer-notes, .legend { display: flex; align-items: center; gap: 4px; }
 .footer-notes { gap: 15px; flex-wrap: wrap; justify-content: flex-end; color: var(--muted); font-size: 11px; }
 .legend span { margin-left: 3px; }
@@ -135,6 +154,10 @@ h1 { font-size: clamp(17px, 2.4vw, 26px); font-weight: 900; line-height: 1.1; le
   .level-number { width: 45px; height: 45px; font-size: 27px; }
   .level { gap: 8px; }
   .level-copy strong { font-size: 16px; }
+}
+@container (max-width: 650px) {
+  .footer { flex-wrap: wrap; }
+  .footer-notes { flex: 1 1 100%; justify-content: flex-start; }
 }
 @media (max-width: 580px) {
   body { place-items: start center; }

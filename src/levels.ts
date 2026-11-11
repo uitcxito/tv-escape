@@ -5,7 +5,8 @@ export const WORLD = { width: 1120, height: 560 }
 export const PLAYER_SPEED = 260
 export const PLAYER_RADIUS = 23
 export const ENEMY_RADIUS = 29
-export const EXIT_RADIUS = 32
+export const EXIT_RADIUS = 40
+export const BATTERY_RADIUS = 16
 export const STEP = 1 / 120
 
 export const CAST = {
@@ -21,70 +22,73 @@ export const CAST = {
 } as const
 
 export type CastId = keyof typeof CAST
-interface Spawn { id: CastId; position: Vec; heading: number }
+interface Spawn { id: CastId; position: Vec; heading: number; delay: number }
 export interface Level extends Arena {
   title: string
   player: Vec
   exit: Vec
   speed: number
   enemies: readonly Spawn[]
+  batteries: readonly Vec[]
 }
 
 const board = (x: number, y: number, w: number, h: number, tone = 0, radius = 16): Board =>
   ({ a: v(x, y), b: v(w, h), radius, tone })
-const at = (id: CastId, x: number, y: number, heading: number): Spawn =>
-  ({ id, position: v(x, y), heading: heading * Math.PI / 180 })
-const level = (title: string, speed: number, player: Vec, exit: Vec, enemies: Spawn[], boards: Board[]): Level =>
-  ({ ...WORLD, title, speed, player, exit, enemies, boards })
+const at = (id: CastId, x: number, y: number, heading: number, delay = 0): Spawn =>
+  ({ id, position: v(x, y), heading: heading * Math.PI / 180, delay })
+const level = (title: string, speed: number, player: Vec, exit: Vec, enemies: Spawn[], boards: Board[],
+  batteries: Vec[]): Level => ({ ...WORLD, title, speed, player, exit, enemies, boards, batteries })
 
 export const LEVELS: readonly Level[] = [
   level('试播现场', 140, v(132, 427), v(991, 139), [at('zhang', 787, 402, 148)], [
     board(319, 179, 526, 179), board(662, 294, 824, 220, 1), board(390, 385, 574, 385, 2),
-  ]),
+  ], [v(319, 447)]),
   level('斜板首秀', 160, v(121, 145), v(995, 429), [at('zhang', 825, 133, 164)], [
     board(291, 194, 445, 315, 1), board(482, 135, 654, 88),
     board(564, 411, 747, 308, 2), board(858, 195, 943, 267, 1),
-  ]),
+  ], [v(465, 429), v(756, 161)]),
   level('双人夹击', 180, v(111, 415), v(1001, 135), [at('zhang', 418, 113, 113), at('ma', 837, 452, -138)], [
     board(252, 229, 252, 370, 1), board(389, 264, 630, 264),
     board(667, 124, 794, 164, 2), board(804, 295, 947, 352, 1),
-  ]),
-  level('反向折返', 220, v(129, 124), v(983, 425), [
-    at('zhang', 595, 155, 123), at('ma', 870, 437, -138), at('chen', 610, 428, -135),
+  ], [v(320, 430), v(715, 286)]),
+  level('反向折返', 185, v(129, 124), v(983, 425), [
+    at('zhang', 595, 155, 123), at('ma', 870, 437, -138, .28), at('chen', 610, 428, -135, .65),
   ], [
-    board(285, 30, 285, 333, 1), board(496, 230, 496, 530),
-    board(711, 30, 711, 333, 2), board(914, 241, 1034, 241),
-  ]),
-  level('环线追车', 260, v(122, 423), v(988, 141), [
-    at('zhang', 395, 101, 151), at('ma', 859, 409, 162), at('liu', 955, 262, -88), at('pony', 192, 163, 76),
+    board(285, 30, 285, 310, 1), board(496, 248, 496, 530),
+    board(711, 30, 711, 308, 2), board(914, 241, 1034, 241),
+  ], [v(390, 414), v(609, 206)]),
+  level('环线追车', 195, v(122, 423), v(988, 141), [
+    at('zhang', 395, 101, 151), at('ma', 859, 409, 162, .30), at('liu', 955, 262, -88, .80),
+    at('pony', 192, 163, 76, 1),
   ], [
     board(340, 193, 547, 193, 1), board(572, 193, 779, 193),
     board(340, 373, 549, 373), board(573, 373, 778, 373, 2),
-    board(330, 205, 330, 360), board(788, 204, 788, 359, 1),
-  ]),
-  level('交叉回响', 300, v(116, 142), v(1004, 429), [
-    at('zhang', 801, 115, 147), at('ma', 314, 440, -132), at('liu', 968, 250, 159),
-    at('chen', 547, 298, 174), at('pony', 1070, 470, -158),
+    board(330, 205, 330, 235), board(788, 204, 788, 243, 1),
+  ], [v(565, 296), v(681, 452)]),
+  level('交叉回响', 208, v(116, 142), v(1004, 429), [
+    at('zhang', 801, 115, 147), at('ma', 314, 440, -132, .40), at('liu', 968, 250, 159, .60),
+    at('chen', 547, 298, 174, 1.25), at('pony', 1070, 470, -158, 1.45),
   ], [
     board(255, 208, 365, 269, 2), board(474, 96, 521, 224, 1),
     board(675, 174, 741, 233), board(498, 365, 625, 458, 1),
     board(781, 374, 891, 321, 2),
-  ]),
-  level('双线突围', 345, v(119, 278), v(1002, 278), [
-    at('zhang', 389, 115, 150), at('ma', 711, 436, -155), at('liu', 1025, 111, 127),
-    at('chen', 165, 450, -24), at('pony', 683, 113, 148), at('lei', 940, 430, -153), at('li', 430, 433, -135),
+  ], [v(420, 130), v(691, 403)]),
+  level('双线突围', 220, v(119, 278), v(1002, 278), [
+    at('zhang', 389, 115, 150), at('ma', 711, 436, -155), at('liu', 1025, 111, 127, .45),
+    at('chen', 165, 450, -24, 1.35), at('pony', 683, 113, 148, .75), at('lei', 940, 430, -153, 1.10),
+    at('li', 430, 433, -135, 1.65),
   ], [
     board(269, 237, 343, 280, 1), board(343, 280, 269, 323, 1),
     board(447, 278, 694, 278), board(694, 278, 823, 278, 2),
     board(480, 105, 578, 147, 2), board(590, 430, 675, 470, 1),
-  ]),
-  level('终极逃亡', 390, v(116, 417), v(1004, 137), [
-    at('zhang', 368, 104, 135), at('ma', 818, 452, -155), at('liu', 1004, 355, -120),
-    at('chen', 318, 415, -157), at('pony', 1062, 68, 161), at('lei', 608, 463, -127),
-    at('li', 447, 237, 163), at('wang', 691, 105, 154), at('zhou', 938, 236, 147),
+  ], [v(382, 169), v(780, 422)]),
+  level('终极逃亡', 232, v(116, 417), v(1004, 137), [
+    at('zhang', 368, 104, 135), at('ma', 818, 452, -155), at('liu', 1004, 355, -120, .45),
+    at('chen', 318, 415, -157, 2.20), at('pony', 1062, 68, 161, 1.20), at('lei', 608, 463, -127, 1.70),
+    at('li', 447, 237, 163, 1.30), at('wang', 691, 105, 154, 1.70), at('zhou', 938, 236, 147, 2.30),
   ], [
     board(225, 210, 332, 284, 2), board(393, 381, 493, 471),
     board(480, 155, 602, 96, 1), board(510, 286, 657, 286, 2),
     board(730, 181, 835, 229), board(771, 369, 900, 307, 1),
-  ]),
+  ], [v(316, 495), v(874, 132)]),
 ]

@@ -1,12 +1,32 @@
-import { LEVELS, PLAYER_RADIUS, PLAYER_SPEED, ENEMY_RADIUS, EXIT_RADIUS, STEP } from './levels'
+import { BATTERY_RADIUS, LEVELS, PLAYER_RADIUS, PLAYER_SPEED, ENEMY_RADIUS, EXIT_RADIUS, STEP } from './levels'
 import type { CastId, Level } from './levels'
 import { add, length, meet, move, mul, sub, unit, v } from './physics'
 import type { Span, Vec } from './physics'
 
-export type GameEvent = { type: 'catch'; actor: CastId } | { type: 'advance' | 'win' }
+export const MAX_CHARGES = 3
+export const PULSE_RADIUS = 158
+export const PULSE_DURATION = .56
+const PULSE_SHIELD = .72
+const DISRUPTED_TIME = 1.10
+const DISRUPTED_SPEED = .64
+
+export type GameEvent =
+  | { type: 'catch'; actor: CastId }
+  | { type: 'pickup'; charged: boolean }
+  | { type: 'advance' | 'win' }
 export type Mode = 'ready' | 'running' | 'paused' | 'won'
-export type Hint = 'move' | 'dodge' | 'exit' | null
-export interface Enemy { id: CastId; position: Vec; velocity: Vec; trail: Vec[] }
+export type Hint = 'move' | 'dodge' | 'exit' | 'pulse' | null
+export interface Enemy {
+  id: CastId
+  position: Vec
+  velocity: Vec
+  trail: Vec[]
+  delay: number
+  disrupted: number
+}
+
+const stepTimer = (time: number) => time > STEP + 1e-9 ? time - STEP : 0
+const stationary = (at: Vec): Span => ({ from: at, to: at, start: 0, end: STEP })
 
 export class Game {
   index = 0
@@ -20,22 +40,34 @@ export class Game {
   shield = 0
   lastCaught: Vec | null = null
   moving = false
+  charge = 1
+  readonly takenBatteries = new Set<number>()
+  batteriesFound = 0
+  pulseHits = 0
+  pulse: { origin: Vec; remaining: number } | null = null
   private trailStep = 0
   private resumeMode: 'ready' | 'running' = 'ready'
   private firstBounceAt: number | null = null
+  private hasPulsed = false
+  private pulseHintEnds = 0
 
   constructor(readonly levels = LEVELS) { this.load() }
   get level(): Level { return this.levels[this.index] }
   get protected() { return this.shield > 0 }
+  get canPulse() { return this.mode === 'running' && this.charge > 0 && this.pulse === null }
 
   private load() {
     this.player = this.level.player
     this.facing = this.player.x < this.level.exit.x ? 1 : -1
     this.moving = false
     this.trailStep = 0
+    const reserve = this.level.enemies.length >= 7 ? 2 : 1
+    this.charge = Math.max(reserve, this.charge)
+    this.pulse = null
     this.enemies = this.level.enemies.map(e => ({
       id: e.id, position: e.position,
       velocity: v(this.level.speed * Math.cos(e.heading), this.level.speed * Math.sin(e.heading)), trail: [],
+      delay: e.delay, disrupted: 0,
     }))
   }
 
@@ -57,24 +89,71 @@ export class Game {
   restart() {
     this.index = this.attempts = this.time = this.shield = 0
     this.firstBounceAt = this.lastCaught = null
+    this.charge = 1
+    this.takenBatteries.clear()
+    this.batteriesFound = this.pulseHits = this.pulseHintEnds = 0
+    this.hasPulsed = false
     this.mode = 'ready'
     this.hint = 'move'
     this.load()
+  }
+
+  releasePulse(): number | undefined {
+    if (!this.canPulse) return
+    this.charge--
+    this.hasPulsed = true
+    if (this.hint === 'pulse') this.hint = null
+    this.pulse = { origin: this.player, remaining: PULSE_DURATION }
+    this.shield = Math.max(this.shield, PULSE_SHIELD)
+    let hits = 0
+    for (const enemy of this.enemies) {
+      const offset = sub(enemy.position, this.player)
+      const distance = length(offset)
+      if (enemy.delay > 0 || distance > PULSE_RADIUS) continue
+      const direction = distance > 0 ? mul(offset, 1 / distance) : v(this.facing, 0)
+      enemy.velocity = mul(direction, this.level.speed)
+      enemy.disrupted = DISRUPTED_TIME
+      enemy.trail.length = 0
+      hits++
+    }
+    this.pulseHits += hits
+    return hits
+  }
+
+  private collectBatteries(path: Span[], until: number): GameEvent | undefined {
+    let pickedUp = false
+    const charge = this.charge
+    for (const [i, position] of this.level.batteries.entries()) {
+      if (this.takenBatteries.has(i) ||
+          meet(path, [stationary(position)], PLAYER_RADIUS + BATTERY_RADIUS) > until) continue
+      this.takenBatteries.add(i)
+      this.batteriesFound++
+      this.charge = Math.min(MAX_CHARGES, this.charge + 1)
+      pickedUp = true
+    }
+    if (pickedUp) return { type: 'pickup', charged: this.charge > charge }
   }
 
   tick(input: Vec): GameEvent | undefined {
     if (this.mode !== 'running') return
     this.time += STEP
     const dt = STEP
+    if (this.pulse) {
+      this.pulse.remaining = stepTimer(this.pulse.remaining)
+      if (!this.pulse.remaining) this.pulse = null
+    }
+    if (this.hint === 'pulse' && this.time >= this.pulseHintEnds) this.hint = null
     const active = Math.min(dt, this.shield)
-    this.shield = Math.max(0, this.shield - dt)
-    if (this.shield < 1e-9) this.shield = 0
+    this.shield = stepTimer(this.shield)
     if (input.x) this.facing = Math.sign(input.x)
     const player = move(this.player, mul(unit(input), PLAYER_SPEED), dt, PLAYER_RADIUS, this.level)
-    const exit: Span = { from: this.level.exit, to: this.level.exit, start: 0, end: dt }
-    const escape = meet(player.path, [exit], EXIT_RADIUS)
-    const enemies = this.enemies.map(e =>
-      move(e.position, e.velocity, dt, ENEMY_RADIUS, this.level, player.position))
+    const escape = meet(player.path, [stationary(this.level.exit)], EXIT_RADIUS)
+    const enemies = this.enemies.map(e => {
+      if (e.delay > 0) return
+      const disrupted = e.disrupted > 0
+      return move(e.position, disrupted ? mul(e.velocity, DISRUPTED_SPEED) : e.velocity, dt,
+        ENEMY_RADIUS, this.level, disrupted ? null : player.position)
+    })
     // If immunity ends mid-tick, only test the unprotected portion of the paths.
     const vulnerable = active < dt ? player.path.flatMap(s => {
       if (s.end < active) return []
@@ -84,13 +163,15 @@ export class Game {
     }) : []
     let caughtAt = Infinity
     let caughtBy: CastId | undefined
-    for (const [i, enemy] of enemies.entries()) {
-      const time = meet(vulnerable, enemy.path, PLAYER_RADIUS + ENEMY_RADIUS)
+    for (const [i, motion] of enemies.entries()) {
+      if (!motion || this.enemies[i].disrupted > 0) continue
+      const time = meet(vulnerable, motion.path, PLAYER_RADIUS + ENEMY_RADIUS)
       if (time < caughtAt) {
         caughtAt = time
         caughtBy = this.enemies[i].id
       }
     }
+    const pickup = this.collectBatteries(player.path, Math.min(caughtAt, escape, dt))
     if (caughtBy && caughtAt <= dt && caughtAt <= escape) {
       this.attempts++
       this.lastCaught = player.position
@@ -107,6 +188,11 @@ export class Game {
         return { type: 'win' }
       }
       this.index++
+      this.takenBatteries.clear()
+      if (this.index === 1 && !this.hasPulsed) {
+        this.hint = 'pulse'
+        this.pulseHintEnds = this.time + 2.9
+      }
       this.shield = 0
       this.lastCaught = null
       this.load()
@@ -116,18 +202,24 @@ export class Game {
     this.moving = length(sub(this.player, player.position)) > 0.1
     this.player = player.position
     this.trailStep = (this.trailStep + 1) % 4
-    enemies.forEach((m, i) => {
-      const e = this.enemies[i]
+    this.enemies.forEach((e, i) => {
+      const m = enemies[i]
+      if (!m) {
+        e.delay = stepTimer(e.delay)
+        return
+      }
       if (this.trailStep === 0) {
         e.trail.unshift(e.position)
         if (e.trail.length > 10) e.trail.pop()
       }
       e.position = m.position
-      e.velocity = m.velocity
+      e.velocity = e.disrupted > 0 ? mul(m.velocity, 1 / DISRUPTED_SPEED) : m.velocity
+      e.disrupted = stepTimer(e.disrupted)
     })
     if (this.hint === 'dodge') {
-      if (this.firstBounceAt === null && enemies.some(m => m.bounces)) this.firstBounceAt = this.time
+      if (this.firstBounceAt === null && enemies.some(m => m?.bounces)) this.firstBounceAt = this.time
       if (this.firstBounceAt !== null && this.moving && this.time - this.firstBounceAt > .85) this.hint = 'exit'
     }
+    return pickup
   }
 }

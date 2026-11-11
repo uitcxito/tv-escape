@@ -1,5 +1,6 @@
 import { CAST, ENEMY_RADIUS, WORLD } from './levels'
 import type { CastId, Level } from './levels'
+import { PULSE_DURATION, PULSE_RADIUS } from './game'
 import type { Game } from './game'
 import type { Board, Vec } from './physics'
 
@@ -82,7 +83,7 @@ function drawBoard(c: CanvasRenderingContext2D, b: Board) {
   c.restore()
 }
 
-function drawFloor(c: CanvasRenderingContext2D, level: Level, index: number) {
+function drawFloor(c: CanvasRenderingContext2D, level: Level) {
   const { width: w, height: h } = WORLD
   const base = c.createLinearGradient(0, 0, 0, h)
   base.addColorStop(0, '#f5fbff')
@@ -105,9 +106,6 @@ function drawFloor(c: CanvasRenderingContext2D, level: Level, index: number) {
   for (const [x, y, dx, dy] of [[12, 12, 1, 1], [w - 12, 12, -1, 1], [12, h - 12, 1, -1], [w - 12, h - 12, -1, -1]]) {
     line(c, [x, y + dy * 22, x, y, x + dx * 22, y], '#8396b67d', 2)
   }
-  label(c, `STAGE  ${String(index + 1).padStart(2, '0')}`, w / 2, 40, 15, '#6b7f9a', true)
-  line(c, [w / 2 - 75, 40, w / 2 - 49, 40], '#a0b2cb99', 1)
-  line(c, [w / 2 + 49, 40, w / 2 + 75, 40], '#a0b2cb99', 1)
   const { x, y } = level.player
   c.setLineDash([4, 5])
   disc(c, x, y, 35, '#b6ceeb30', '#92abd58f')
@@ -145,6 +143,49 @@ function drawDoor(c: CanvasRenderingContext2D, p: Vec, time: number) {
   c.restore()
 }
 
+function drawBattery(c: CanvasRenderingContext2D, p: Vec, t: number, showLabel: boolean) {
+  c.save()
+  c.translate(p.x, p.y)
+  disc(c, 0, 0, 24, '#ffe49947')
+  c.setLineDash([3, 4])
+  disc(c, 0, 0, 23, '#fff2ba3b', '#bd8d3a', 1.4)
+  c.setLineDash([])
+  c.translate(0, Math.sin(t * 4 + p.x * .013) * 3)
+  round(c, -11, -11, 24, 28, 6, '#37274728')
+  round(c, -5, -17, 10, 7, 2, '#fff2a9', INK, 2)
+  round(c, -11, -12, 22, 27, 5, '#ffcc56', INK, 2.6)
+  round(c, -7, -9, 5, 16, 2, '#fff3bba6')
+  c.beginPath()
+  c.moveTo(1, -8)
+  c.lineTo(-5, 2)
+  c.lineTo(0, 2)
+  c.lineTo(-1, 10)
+  c.lineTo(6, -1)
+  c.lineTo(1, -1)
+  c.closePath()
+  c.fillStyle = '#67442c'
+  c.fill()
+  if (showLabel) label(c, '电池', 0, 36, 12, '#79532e')
+  c.restore()
+}
+
+function drawPulse(c: CanvasRenderingContext2D, pulse: NonNullable<Game['pulse']>) {
+  const progress = 1 - pulse.remaining / PULSE_DURATION
+  const r = 36 + (PULSE_RADIUS - 36) * (1 - (1 - progress) ** 3)
+  const { x, y } = pulse.origin
+  c.save()
+  c.globalAlpha = .78 * (1 - progress)
+  disc(c, x, y, r, '#a8dfff35', '#6a78dd', 4)
+  c.setLineDash([8, 9])
+  disc(c, x, y, r + 7, '#ffffff00', '#8466d8', 2)
+  c.setLineDash([])
+  for (let i = 0; i < 8; i++) {
+    const angle = i * TAU / 8 + .16
+    disc(c, x + Math.cos(angle) * (r + 13), y + Math.sin(angle) * (r + 13), 3, '#6860cd')
+  }
+  c.restore()
+}
+
 function drawTV(c: CanvasRenderingContext2D, game: Game, t: number) {
   const { player: p, moving, facing } = game
   c.save()
@@ -169,7 +210,7 @@ function drawTV(c: CanvasRenderingContext2D, game: Game, t: number) {
   round(c, 8, 13, 12, 12, 3, '#fd8fbc', INK, 3)
   round(c, -29, -20, 58, 41, 12, '#f580b9', INK, 4)
   round(c, -27, -19, 53, 35, 10, '#87aaff', INK, 2)
-  round(c, -21, -13, 35, 23, 7, '#c9fbff', INK, 2.3)
+  round(c, -21, -13, 35, 23, 7, game.pulse ? '#fff0ad' : '#c9fbff', INK, 2.3)
   round(c, -18, -11, 19, 3, 1, '#ffffffba')
   const x = facing * 1.7
   line(c, [-11 + x, -4, -11 + x, 0], INK, 2.4)
@@ -211,11 +252,15 @@ export class Renderer {
     if (this.floorLevel !== game.index) {
       const fc = this.floor.getContext('2d')!
       fc.setTransform(2, 0, 0, 2, 0, 0)
-      drawFloor(fc, game.level, game.index)
+      drawFloor(fc, game.level)
       this.floorLevel = game.index
     }
     c.drawImage(this.floor, 0, 0, w, h)
     drawDoor(c, game.level.exit, time)
+    game.level.batteries.forEach((p, i) => {
+      if (!game.takenBatteries.has(i)) drawBattery(c, p, time, game.index === 0)
+    })
+    if (game.pulse) drawPulse(c, game.pulse)
 
     for (const enemy of game.enemies) {
       const info = CAST[enemy.id]
@@ -229,8 +274,11 @@ export class Renderer {
     for (const enemy of game.enemies) {
       const { x, y } = enemy.position
       const info = CAST[enemy.id]
+      const waiting = enemy.delay > 0
+      const disrupted = enemy.disrupted > 0
+      c.globalAlpha = waiting ? .53 : 1
       disc(c, x, y + 5, ENEMY_RADIUS + 1, '#29213b2d')
-      disc(c, x, y, ENEMY_RADIUS, info.color, INK, 3)
+      disc(c, x, y, ENEMY_RADIUS, disrupted ? '#a6c9ff' : info.color, INK, 3)
       c.save()
       c.beginPath()
       c.arc(x, y, ENEMY_RADIUS - 5, 0, TAU)
@@ -242,11 +290,23 @@ export class Renderer {
         disc(c, x, y, r, info.light)
         label(c, info.name[0], x, y, 24, INK)
       }
+      if (disrupted) {
+        for (let dy = -20; dy < 25; dy += 7) {
+          line(c, [x - r, y + dy, x + r, y + dy], '#e6f8ffc4', 2.5)
+        }
+      }
       c.restore()
+      c.globalAlpha = 1
       const tagX = Math.max(34, Math.min(w - 34, x))
       const tagY = y + (y > h - 61 ? -35 : 35)
       round(c, tagX - 32, tagY - 10, 64, 20, 6, info.light, INK, 1.8)
       label(c, info.name, tagX, tagY, 12, INK)
+      if (waiting || disrupted) {
+        const badgeX = x > w - 54 ? x - 23 : x + 23
+        const badgeY = y < 39 ? y + 22 : y - 22
+        disc(c, badgeX, badgeY, 10, waiting ? '#f4f0ff' : '#d8f3ff', INK, 1.5)
+        label(c, waiting ? '待' : '✦', badgeX, badgeY, 11, '#494b82')
+      }
     }
 
     drawTV(c, game, time)

@@ -1,6 +1,6 @@
 import './style.css'
 import { Sound } from './audio'
-import { Game } from './game'
+import { Game, MAX_CHARGES } from './game'
 import type { Hint, Mode } from './game'
 import { CAST, LEVELS, STEP, WORLD } from './levels'
 import { v } from './physics'
@@ -11,6 +11,10 @@ const game = new Game()
 const renderer = new Renderer(byId<HTMLCanvasElement>('map'))
 const pause = byId<HTMLButtonElement>('pause')
 const mute = byId<HTMLButtonElement>('mute')
+const pulseButton = byId<HTMLButtonElement>('pulse')
+const powerCount = byId('power-count')
+const powerCells = Array.from({ length: MAX_CHARGES }, () => document.createElement('span'))
+byId('power-cells').append(...powerCells)
 const unlock = byId<HTMLButtonElement>('unlock')
 const overlay = byId('overlay')
 const action = byId<HTMLButtonElement>('result-action')
@@ -23,10 +27,14 @@ const hints: Record<NonNullable<Hint>, string> = {
   move: '<kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> 移动',
   dodge: '躲开头像，注意反弹',
   exit: '进入绿门过关',
+  pulse: '<kbd>空格</kbd> 释放干扰<br>捡电池可补充',
 }
+const batteryTotal = LEVELS.reduce((total, level) => total + level.batteries.length, 0)
 let shownHint: Hint
 let shownMode: Mode
 let shownIndex = -1
+let shownCharge = -1
+let shownPulseReady: boolean | undefined
 let impact = 0
 let toast = 0
 let accumulated = 0
@@ -45,8 +53,7 @@ function updateSound() {
   byId('sound-waves').style.display = sound.muted ? 'none' : ''
   byId('sound-cross').style.display = sound.muted ? '' : 'none'
   const { music, hit } = sound.status
-  unlock.hidden = !sound.blocked || sound.muted || (music === 'missing' && hit === 'missing') ||
-    game.mode === 'won' || game.mode === 'paused'
+  unlock.hidden = !sound.blocked || sound.muted || game.mode === 'won' || game.mode === 'paused'
   audioNote.textContent = music === 'missing' && hit === 'missing' ? '本地音频未加载'
     : music === 'missing' ? '《U Can’t Touch This》未加载'
     : hit === 'missing' ? '碰撞短句未加载' : ''
@@ -96,7 +103,10 @@ function updateMode() {
     byId('result-icon').textContent = won ? '08 / 08' : 'Ⅱ'
     byId('result-kicker').textContent = won ? 'SIGNAL CLEAR · 通关' : 'ON HOLD · 暂停'
     byId('result-title').textContent = won ? '成功逃出！' : '游戏暂停'
-    byId('result-description').textContent = won ? `八关全部完成 · 被追上 ${game.attempts} 次` : '继续后，用 WASD 接着跑。'
+    const summary = `八关全部完成 · 电池 ${game.batteriesFound} / ${batteryTotal}`
+    byId('result-description').textContent = won
+      ? summary + (game.pulseHits ? ` · 干扰命中 ${game.pulseHits} 次` : '')
+      : '继续后，用 WASD 接着跑。'
     action.textContent = won ? '再玩一次' : '继续游戏'
     action.focus({ preventScroll: true })
   } else if (restoreFocus) pause.focus({ preventScroll: true })
@@ -115,16 +125,29 @@ function updateHint() {
   bubble.hidden = hidden
   if (hidden) return
   // Teach at the relevant spot without letting the callout obscure the moving actor.
-  const p = hint === 'move' ? game.level.player : hint === 'dodge'
+  const p = hint === 'move' || hint === 'pulse' ? game.level.player : hint === 'dodge'
     ? game.level.enemies[0].position : game.level.exit
   bubble.style.setProperty('--x', `${p.x / WORLD.width * 100}%`)
   bubble.style.setProperty('--y', `${p.y / WORLD.height * 100}%`)
+}
+
+function updatePower() {
+  if (shownCharge !== game.charge) {
+    shownCharge = game.charge
+    powerCount.textContent = `剩余 ${game.charge} 次`
+    powerCells.forEach((cell, index) => cell.classList.toggle('charged', index < game.charge))
+  }
+  if (shownPulseReady !== game.canPulse) {
+    shownPulseReady = game.canPulse
+    pulseButton.setAttribute('aria-disabled', String(!game.canPulse))
+  }
 }
 
 function sync() {
   if (shownIndex !== game.index) updateLevel()
   if (shownMode !== game.mode) updateMode()
   updateHint()
+  updatePower()
 }
 
 function togglePause() {
@@ -142,12 +165,29 @@ function pauseForBlur() {
   sync()
 }
 
+function showFeedback(message: string, color: string, seconds: number) {
+  toast = seconds
+  feedback.textContent = message
+  feedback.style.setProperty('--tag', color)
+  feedback.hidden = false
+}
+
+function releasePulse() {
+  const hits = game.releasePulse()
+  if (hits === undefined) return
+  sound.enable()
+  sound.effect('pulse')
+  showFeedback(hits ? `干扰命中 ${hits} 名 · 快溜！` : '干扰已释放 · 短时保护', '#fff1b9', 1.35)
+  sync()
+}
+
 pause.addEventListener('click', () => { sound.enable(); togglePause() })
 mute.addEventListener('click', () => {
   if (sound.needsActivation) sound.enable()
   else sound.toggleMute()
 })
 unlock.addEventListener('click', () => sound.enable())
+pulseButton.addEventListener('click', releasePulse)
 action.addEventListener('click', () => {
   sound.enable()
   if (game.mode === 'won') {
@@ -169,6 +209,11 @@ window.addEventListener('keydown', e => {
       accumulated = 0
     }
     if (game.mode === 'running' && !e.repeat) down.add(e.code)
+    return
+  }
+  if (e.code === 'Space' && game.mode === 'running') {
+    e.preventDefault()
+    if (!e.repeat) releasePulse()
     return
   }
   if (e.repeat) return
@@ -202,11 +247,12 @@ function frame(now: number) {
         const actor = CAST[event.actor]
         sound.caught(event.actor)
         impact = 1
-        toast = 2.2
-        feedback.hidden = false
-        feedback.style.setProperty('--tag', actor.light)
-        feedback.textContent = `${actor.name}：「${actor.line}」 · 重新出发 · ${game.attempts}`
+        showFeedback(`${actor.name}：「${actor.line}」 · 重新出发 · ${game.attempts}`, actor.light, 2.2)
+      } else if (event?.type === 'pickup') {
+        sound.effect('pickup')
+        showFeedback(event.charged ? '电池 +1 · 空格释放干扰' : '已收集电池 · 干扰电量已满', '#fff1b9', 1.25)
       } else if (event) {
+        sound.effect('clear')
         impact = toast = 0
       }
     }
