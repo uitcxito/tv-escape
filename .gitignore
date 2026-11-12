@@ -5,3 +5,4 @@ __pycache__/
 *.local
 public/audio/*
 !public/audio/README.md
+!public/audio/music.mp3
