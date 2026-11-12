@@ -4,6 +4,8 @@ import type { CastId } from './levels'
 const AUDIO = {
   music: ['audio/music.mp3', 'audio/music.flac', 'audio/music.m4a', 'audio/music.wav'],
   hit: 'audio/hit.mp3',
+  // Opening vocal in the local album version, before the instrumental starts.
+  catchClip: { start: .50, end: 1.31 },
   musicVolume: .42,
   duckVolume: .10,
   voiceVolume: .95,
@@ -44,7 +46,8 @@ export class Sound {
   get status() {
     const music = this.availability.get('music') ?? 'missing'
     const voices = TRACKS.filter(([track]) => track !== 'music')
-    const hit = voices.some(([track]) => this.availability.get(track) === 'ready') ? 'ready'
+    const hasCatchClip = (this.buffers.music?.duration ?? 0) >= AUDIO.catchClip.end
+    const hit = hasCatchClip || voices.some(([track]) => this.availability.get(track) === 'ready') ? 'ready'
       : voices.some(([track]) => this.availability.get(track) === 'loading') ? 'loading' : 'missing'
     return { music, hit }
   }
@@ -195,12 +198,23 @@ export class Sound {
   }
 
   caught(actor: CastId) {
-    this.stopMusic()
-    this.startMusic()
-
     const ctx = this.context
-    const buffer = this.buffers[actor] ?? this.buffers.hit
-    if (ctx?.state !== 'running' || !buffer || !this.master || this.muted) return
+    const output = this.master
+    if (ctx?.state !== 'running' || !output || this.muted) return
+
+    const voice = this.buffers[actor] ?? this.buffers.hit
+    const playVoice = () => {
+      if (!voice || this.muted) return
+      this.playCatchAudio(ctx, output, voice, 0, voice.duration)
+    }
+    const music = this.buffers.music
+    const { start, end } = AUDIO.catchClip
+    if (music && music.duration >= end) this.playCatchAudio(ctx, output, music, start, end - start, playVoice)
+    else playVoice()
+  }
+
+  private playCatchAudio(ctx: AudioContext, output: GainNode, buffer: AudioBuffer,
+    offset: number, duration: number, after?: () => void) {
     if (this.voice) {
       this.voice.stop()
       this.voice.disconnect()
@@ -210,18 +224,19 @@ export class Sound {
     const gain = ctx.createGain()
     gain.gain.value = AUDIO.voiceVolume
     source.buffer = buffer
-    source.connect(gain).connect(this.master)
+    source.connect(gain).connect(output)
     source.onended = () => {
       source.disconnect()
       gain.disconnect()
       if (this.voice === source) {
         this.voice = undefined
         this.setMusicVolume(AUDIO.musicVolume, .20)
+        after?.()
       }
     }
     // Keep cleanup for a replaced clip without restoring music during the new clip.
     this.voice = source
     this.setMusicVolume(AUDIO.duckVolume, .025)
-    source.start()
+    source.start(0, offset, duration)
   }
 }

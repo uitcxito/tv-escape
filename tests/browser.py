@@ -44,7 +44,7 @@ AUDIO_PROBE = """
       const start = source.start.bind(source), stop = source.stop.bind(source);
       source.start = (...args) => {
         audioProbe.starts.push({ loop: source.loop, time: this.currentTime, duration: source.buffer.duration,
-          offset: args[1] ?? 0 });
+          offset: args[1] ?? 0, playDuration: args[2] ?? source.buffer.duration });
         return start(...args);
       };
       source.stop = (...args) => {
@@ -72,7 +72,7 @@ AUDIO_PROBE = """
             meter.getFloatFrequencyData(fft);
             const at = hz => Math.max(...fft.slice(Math.round(hz / this.sampleRate * meter.fftSize) - 1,
               Math.round(hz / this.sampleRate * meter.fftSize) + 2));
-            return [at(440), at(990)];
+            return [at(440), at(990), at(750)];
           };
         }
         return connect(target, ...args);
@@ -84,13 +84,14 @@ AUDIO_PROBE = """
 """
 
 
-def wav(frequency, duration):
+def wav(frequency, duration, clip=None):
     """Test signals served through request interception only, never shipped."""
     hz = 44100
-    samples = array.array("h", (
-        int(math.sin(2 * math.pi * frequency * i / hz) * 8000)
-        for i in range(round(hz * duration))
-    ))
+    samples = array.array("h")
+    for i in range(round(hz * duration)):
+        time = i / hz
+        pitch = clip[2] if clip and clip[0] <= time < clip[1] else frequency
+        samples.append(int(math.sin(2 * math.pi * pitch * time) * 8000))
     data = io.BytesIO()
     with wave.open(data, "wb") as file:
         file.setparams((1, 2, hz, 0, "NONE", "not compressed"))
@@ -105,11 +106,12 @@ def open_game(browser, audio=None):
     page.on("pageerror", lambda error: errors.append(str(error)))
     if audio:
         page.add_init_script(AUDIO_PROBE)
-    if audio in (None, "wave-music"):
+    if audio in (None, "wave-music", "voices"):
         page.route("**/audio/music.*", lambda route: route.fulfill(status=404, body="missing"))
     if audio in ("signals", "wave-music"):
         music = "music.wav" if audio == "wave-music" else "music.mp3"
-        signals = {music: wav(440, .2), "hit.mp3": wav(990, 2.2)}
+        soundtrack = wav(440, .2) if audio == "wave-music" else wav(440, 8, clip=(.5, 1.31, 990))
+        signals = {music: soundtrack, "hit.mp3": wav(750, 2.2)}
         for filename, payload in signals.items():
             page.route(f"**/audio/{filename}",
                        lambda route, _request=None, body=payload: route.fulfill(body=body, content_type="audio/wav"))
@@ -278,6 +280,8 @@ def music_follows_game_start(browser):
 
     page.keyboard.press("d")
     page.wait_for_function("audioProbe.starts.filter(source => source.loop).length === 1", polling=25)
+    page.wait_for_timeout(700)
+    assert page.evaluate("audioProbe.spectrum()?.[0] > -42")
     for route in ROUTES["stages"]:
         drive(page, route)
     expect(page.get_by_role("heading", name="成功逃出！")).to_be_visible()
@@ -302,23 +306,25 @@ def sound_and_retries(browser):
     page.get_by_role("button", name="开启声音").click()
     expect(page.get_by_role("button", name="开启声音")).to_be_hidden()
     page.wait_for_function("audioProbe.starts.length === 1 && audioProbe.starts[0].loop", polling=25)
-    # Wait past several wraps of the 200ms signal, then measure actual audio samples.
-    page.wait_for_function("audioProbe.spectrum()?.[0] > -42", polling=25)
-    page.wait_for_timeout(700)
+    # Wait until the loop itself has played past the sampled phrase.
+    page.wait_for_function("audioProbe.spectrum()?.[1] > -42", polling=25)
+    page.wait_for_function("audioProbe.spectrum()?.[0] > -42 && audioProbe.spectrum()?.[1] < -90", polling=25)
     music = page.evaluate("audioProbe.spectrum()[0]")
     assert music > -42, music
     drive(page, ROUTES["catch"])
     expect(page.locator("#feedback")).to_contain_text("重新出发 · 1")
-    page.wait_for_function("audioProbe.starts.length === 3 && audioProbe.spectrum()?.[1] > -40", polling=25)
-    assert page.evaluate("audioProbe.starts.filter(s => s.loop).map(s => s.offset)") == [0, 0]
-    assert page.evaluate("audioProbe.stops.filter(s => s.loop).length") == 1
-    page.wait_for_function(f"audioProbe.spectrum()?.[0] < {music - 8}", polling=25)
+    page.wait_for_function(f"audioProbe.spectrum()?.[1] > -40 && audioProbe.spectrum()?.[0] < {music - 8}", polling=25)
     drive(page, ROUTES["catch"])
     expect(page.locator("#feedback")).to_contain_text("重新出发 · 2")
-    assert page.evaluate("audioProbe.starts.filter(s => s.loop).map(s => s.offset)") == [0, 0, 0]
-    assert page.evaluate("audioProbe.stops.filter(s => s.loop).length") == 2
-    assert page.evaluate("audioProbe.starts.filter(s => !s.loop).length") == 2
-    assert page.evaluate("audioProbe.stops.filter(s => !s.loop).length") == 1
+    assert page.evaluate("audioProbe.starts.filter(s => s.loop).length") == 1
+    assert page.evaluate("audioProbe.stops.filter(s => s.loop).length") == 0
+    clips = page.evaluate("audioProbe.starts.filter(s => !s.loop && s.offset > 0)")
+    assert len(clips) == 2 and all(s["offset"] == .5 and abs(s["playDuration"] - .81) < .002 for s in clips)
+    assert page.evaluate("audioProbe.stops.filter(s => !s.loop).length") >= 1
+    page.wait_for_function("audioProbe.starts.at(-1).duration > 2.19 && audioProbe.starts.at(-1).offset === 0",
+                           polling=25)
+    assert page.evaluate("audioProbe.starts.at(-1).time - audioProbe.starts.at(-2).time >= .79")
+    page.wait_for_function("audioProbe.spectrum()?.[2] > -40", polling=25)
     stage(page, 1)
     page.wait_for_function(f"audioProbe.spectrum()?.[0] > {music - 3} && audioProbe.spectrum()?.[1] < -90", polling=25)
     page.keyboard.press("m")
@@ -327,7 +333,7 @@ def sound_and_retries(browser):
     page.wait_for_function("audioProbe.spectrum()?.[0] > -42", polling=25)
     assert not errors, errors
     page.close()
-    print("Browser: activation retry, looping music restarts on each catch, voice replacement, ducking and mute")
+    print("Browser: activation retry, continuous music, sampled catch phrase, voice sequencing, ducking and mute")
 
 
 def batteries_and_pulse(browser):

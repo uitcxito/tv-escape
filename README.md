@@ -29,11 +29,11 @@ npm run preview
 
 九张真人照片位于 [`public/portraits/`](public/portraits)，[署名页](public/portraits/credits.html)注明出处。游戏从本地加载头像和碰撞配音。
 
-碰撞时，最先接触小电视的角色会触发自己的音效、普通话合成配音和字幕。录音位于 [`public/voices/`](public/voices)，字幕为游戏台词。
+碰撞时，先播放原曲开头的「Can’t touch this」，再播放最先接触小电视的角色配音。录音位于 [`public/voices/`](public/voices)，字幕为游戏台词。
 
 本机已安装 MC Hammer 的完整原曲《U Can't Touch This》，时长 4:17，文件在 `public/audio/music.mp3`。换电脑或重新克隆项目时，按 [音频目录说明](public/audio/README.md)放入本地文件。
 
-第一次按 WASD 或点击顶部的“开启声音”会启用声音。按 WASD 开始追逐后，背景原曲从头循环播放。每次被追上复活，音乐从曲首重新播放，角色配音期间会压低背景音。点“再玩一次”后，下次开跑会重新从曲首播放。如果浏览器阻止播放，可点地图右下角的“开启声音”重试。音量和文件路径在 `src/audio.ts`，关卡和台词在 `src/levels.ts`。
+第一次按 WASD 或点击顶部的“开启声音”会启用声音。按 WASD 开始追逐后，背景原曲从头循环播放。每次被追上复活，背景音乐接着播放，短句和角色配音期间会压低音量。点“再玩一次”后，下次开跑会重新从曲首播放。如果浏览器阻止播放，可点地图右下角的“开启声音”重试。音量和文件路径在 `src/audio.ts`，关卡和台词在 `src/levels.ts`。
 
 ## 验证
 
@@ -50,4 +50,4 @@ npm run build
 python tests/browser.py
 ```
 
-可用 `GAME_URL` 指定其他地址，用 `PLAYWRIGHT_CHROMIUM_EXECUTABLE` 指向已有的 Chromium。脚本只用 WASD 走完八关，并单独测试拾取电池、释放干扰、暂停和重试。配音测试检查三条指定台词是否匹配实际播放文件。混音测试用临时 WAV 信号验证循环、复活后从曲首重播、短句替换、背景压低与恢复、静音，以及加载或播放被阻止时的表现。
+可用 `GAME_URL` 指定其他地址，用 `PLAYWRIGHT_CHROMIUM_EXECUTABLE` 指向已有的 Chromium。脚本只用 WASD 走完八关，并单独测试拾取电池、释放干扰、暂停和重试。配音测试检查三条指定台词是否匹配实际播放文件。混音测试用临时 WAV 信号验证循环、复活后连续播放、原曲短句接角色配音、背景压低与恢复、静音，以及加载或播放被阻止时的表现。
