@@ -9,14 +9,17 @@ const AUDIO = {
   musicVolume: .42,
   duckVolume: 0,
   voiceVolume: .95,
+  musicTimeout: 60000,
+  voiceTimeout: 12000,
 } as const
 
 type Track = 'music' | 'hit' | CastId
 type Availability = 'loading' | 'ready' | 'missing'
+const CAST_IDS = Object.keys(CAST) as CastId[]
 const TRACKS: readonly (readonly [Track, readonly string[]])[] = [
   ['music', AUDIO.music],
   ['hit', [AUDIO.hit]],
-  ...(Object.keys(CAST) as CastId[]).map(id => [id, [`voices/${id}.wav`]] as const),
+  ...CAST_IDS.map(id => [id, [`voices/${id}.wav`]] as const),
 ]
 
 const EFFECTS = {
@@ -28,7 +31,7 @@ const EFFECTS = {
 export class Sound {
   muted = false
   blocked = false
-  private availability = new Map<Track, Availability>(TRACKS.map(([track]) => [track, 'loading']))
+  private availability = new Map<Track, Availability>()
   private buffers: Partial<Record<Track, AudioBuffer>> = {}
   private context?: AudioContext
   private master?: GainNode
@@ -53,27 +56,34 @@ export class Sound {
 
   get status() {
     const music = this.availability.get('music') ?? 'missing'
-    const voices = TRACKS.filter(([track]) => track !== 'music')
-    const hasCatchClip = (this.buffers.music?.duration ?? 0) >= AUDIO.catchClip.end
-    const hit = hasCatchClip || voices.some(([track]) => this.availability.get(track) === 'ready') ? 'ready'
-      : voices.some(([track]) => this.availability.get(track) === 'loading') ? 'loading' : 'missing'
-    return { music, hit }
+    const voiceStates = CAST_IDS.map(id => this.availability.get(id))
+    const voices = voiceStates.includes('missing') ? 'missing' : voiceStates.includes('loading') ? 'loading' : 'ready'
+    const hasCollisionAudio = voiceStates.includes('ready') || this.availability.get('hit') === 'ready'
+    return { music, voices, hasCollisionAudio }
   }
 
   get needsActivation() {
     return !this.muted && this.context?.state !== 'running'
   }
 
-  private async preload() {
+  retryMissing() {
+    const missing = TRACKS.filter(([track]) => track !== 'hit' && this.availability.get(track) === 'missing')
+    if (missing.length) void this.preload(missing, 'reload')
+  }
+
+  private async preload(tracks = TRACKS, cache: RequestCache = 'default') {
+    for (const [track] of tracks) this.availability.set(track, 'loading')
+    this.changed()
     let decoder: OfflineAudioContext
     try { decoder = new OfflineAudioContext(2, 1, 44100) }
     catch {
-      this.availability.clear()
+      for (const [track] of tracks) this.availability.set(track, 'missing')
       this.changed()
       return
     }
-    await Promise.all(TRACKS.map(async ([track, paths]) => {
-      const buffer = await this.loadBuffer(decoder, paths)
+    await Promise.all(tracks.map(async ([track, paths]) => {
+      const timeout = track === 'music' ? AUDIO.musicTimeout : AUDIO.voiceTimeout
+      const buffer = await this.loadBuffer(decoder, paths, timeout, cache)
       this.availability.set(track, buffer ? 'ready' : 'missing')
       if (buffer) this.buffers[track] = buffer
       if (track === 'music' && buffer) this.startMusic()
@@ -81,12 +91,11 @@ export class Sound {
     }))
   }
 
-  private async loadBuffer(decoder: OfflineAudioContext, paths: readonly string[]) {
-    const signal = AbortSignal.timeout?.(12000)
+  private async loadBuffer(decoder: OfflineAudioContext, paths: readonly string[], timeout: number, cache: RequestCache) {
     for (const path of paths) {
       try {
         const url = new URL(import.meta.env.BASE_URL + path, document.baseURI)
-        const response = await fetch(url, { signal })
+        const response = await fetch(url, { signal: AbortSignal.timeout?.(timeout), cache })
         if (!response.ok || response.headers.get('Content-Type')?.includes('text/html')) continue
         return await decoder.decodeAudioData(await response.arrayBuffer())
       } catch {

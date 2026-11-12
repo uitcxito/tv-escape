@@ -162,6 +162,59 @@ def player_x(page):
     }""")
 
 
+def slow_audio_and_retry(browser):
+    page = browser.new_page(viewport={"width": 1440, "height": 900})
+    page.add_init_script(CLOCK)
+    page.add_init_script(AUDIO_PROBE + """
+        audioProbe.deny = false;
+        const timeout = AbortSignal.timeout.bind(AbortSignal);
+        AbortSignal.timeout = ms => timeout(ms === 12000 ? 800 : ms);
+    """)
+    errors = []
+    failures = []
+    attempts = {"music.mp3": 0, "zhang.wav": 0}
+    pending_music = []
+    music = wav(440, 3)
+    voice = wav(750, 1.5)
+    page.on("pageerror", lambda error: errors.append(str(error)))
+    page.on("requestfailed", lambda request: failures.append(request.url))
+
+    def serve_audio(route):
+        filename = route.request.url.rsplit("/", 1)[-1]
+        attempts[filename] += 1
+        if attempts[filename] == 1:
+            if filename == "music.mp3":
+                pending_music.append(route)
+            else:
+                route.fulfill(status=503)
+            return
+        route.fulfill(body=music if filename == "music.mp3" else voice, content_type="audio/wav")
+
+    page.route("**/audio/music.*", lambda route: route.fulfill(status=404))
+    page.route("**/audio/music.mp3", serve_audio)
+    page.route("**/voices/zhang.wav", serve_audio)
+    with page.expect_request("**/audio/music.mp3"):
+        page.goto(BASE, wait_until="domcontentloaded")
+    page.wait_for_timeout(1000)  # Hold the soundtrack past the shortened voice deadline.
+    assert not any(url.endswith("/music.mp3") for url in failures), failures
+    pending_music[0].fulfill(status=503)
+    page.wait_for_load_state("networkidle")
+    page.keyboard.press("d")
+    expect(page.locator("#audio-note")).to_contain_text("未加载")
+    page.get_by_role("button", name="重试加载音频").click()
+    page.wait_for_function("audioProbe.starts.some(source => source.loop)", polling=25)
+    expect(page.locator("#audio-note")).to_be_hidden()
+    assert attempts == {"music.mp3": 2, "zhang.wav": 2}, attempts
+
+    drive(page, ROUTES["catch"])
+    page.wait_for_function("audioProbe.starts.length === 3", polling=25)
+    clip, speech = page.evaluate("audioProbe.starts.slice(1)")
+    assert clip["offset"] == .5 and speech["offset"] == 0 and speech["duration"] == 1.5
+    assert not errors, errors
+    page.close()
+    print("Browser: slow soundtrack request survives the voice deadline, and failed music and speech can be retried")
+
+
 def playthrough(browser):
     page, errors = open_game(browser)
     stage(page, 1)
@@ -442,6 +495,7 @@ if __name__ == "__main__":
             headless=True, executable_path=os.environ.get("PLAYWRIGHT_CHROMIUM_EXECUTABLE")
         )
         try:
+            slow_audio_and_retry(browser)
             playthrough(browser)
             pause_and_resize(browser)
             music_follows_game_start(browser)

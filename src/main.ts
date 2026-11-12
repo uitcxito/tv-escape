@@ -52,12 +52,16 @@ function updateSound() {
   byId('mute-label').textContent = needsActivation ? '开启声音' : sound.muted ? '静音' : '声音'
   byId('sound-waves').style.display = sound.muted ? 'none' : ''
   byId('sound-cross').style.display = sound.muted ? '' : 'none'
-  const { music, hit } = sound.status
-  unlock.hidden = !sound.blocked || sound.muted || game.mode === 'won' || game.mode === 'paused'
-  audioNote.textContent = music === 'missing' && hit === 'missing' ? '本地音频未加载'
+  const { music, voices, hasCollisionAudio } = sound.status
+  const canRetry = music === 'missing' || voices === 'missing'
+  unlock.hidden = (!sound.blocked && !canRetry) || sound.muted || game.mode === 'won' || game.mode === 'paused'
+  unlock.textContent = sound.blocked ? '开启声音' : '重试加载音频'
+  const audioStatus = music === 'missing' && !hasCollisionAudio ? '本地音频未加载'
     : music === 'missing' ? '《U Can’t Touch This》未加载'
-    : hit === 'missing' ? '碰撞短句未加载' : ''
-  audioNote.hidden = !audioNote.textContent
+    : voices === 'missing' ? '追捕者语音未全部加载'
+    : music === 'loading' || voices === 'loading' ? '音频加载中…' : ''
+  if (audioNote.textContent !== audioStatus) audioNote.textContent = audioStatus
+  audioNote.hidden = !audioStatus
 }
 
 const sound = new Sound(() => queueMicrotask(updateSound))
@@ -186,7 +190,10 @@ mute.addEventListener('click', () => {
   if (sound.needsActivation) sound.enable()
   else sound.toggleMute()
 })
-unlock.addEventListener('click', () => sound.enable())
+unlock.addEventListener('click', () => {
+  sound.enable()
+  sound.retryMissing()
+})
 pulseButton.addEventListener('click', releasePulse)
 action.addEventListener('click', () => {
   sound.enable()
