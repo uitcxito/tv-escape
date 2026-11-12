@@ -261,7 +261,7 @@ function frame(now: number) {
   }
   feedback.hidden = toast <= 0 || game.mode !== 'running'
   sync()
-  renderer.draw(game, artTime, impact)
+  renderer.draw(game, artTime, impact, sound.speakingActor)
   requestAnimationFrame(frame)
 }
 

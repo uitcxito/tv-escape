@@ -1,0 +1,83 @@
+[
+  {
+    "actor": "ma",
+    "quote": "我对钱没有兴趣。",
+    "source": "https://www.bilibili.com/video/BV1A1421b7cN/",
+    "start": 25.92,
+    "end": 27.35,
+    "duration": 1.43,
+    "sha256": "a0faed665920b385b53f692ad98fa42a7e618a0b0441513efee65c9671386791"
+  },
+  {
+    "actor": "liu",
+    "quote": "我跟她在一起不是因为她漂亮，因为我根本不知道她漂不漂亮。",
+    "source": "https://m.jiemian.com/audio/AGcCOAhuB28BOA==.html",
+    "start": 3.48,
+    "end": 6.6,
+    "duration": 3.12,
+    "sha256": "fc7a39add3eaed2790be2468d8c946fe1badc0c3429c8b2e84b877f59a938f53"
+  },
+  {
+    "actor": "lei",
+    "quote": "台风来的时候，连猪都可以飞。",
+    "source": "https://m.jiemian.com/audio/AGICOQhkB2U=.html",
+    "start": 668,
+    "end": 671.5,
+    "duration": 3.5,
+    "sha256": "23256b7dfbc987655b621c8bf1bb33530a3420e273f7d0b38444c02f075a2bdc"
+  },
+  {
+    "actor": "li",
+    "quote": "What's your problem?",
+    "source": "https://www.bilibili.com/video/BV194411w7nX/",
+    "start": 1.8,
+    "end": 4.1,
+    "duration": 2.3,
+    "sha256": "0b4dfdd05a01f6f125b3b6c75b07227caf1310206ae1ba6d11db87f8c6defc3e"
+  },
+  {
+    "actor": "zhang",
+    "quote": "你对事情的理解，就是你在这件事情上的竞争力。",
+    "source": "https://www.chnfund.com/video-detail/4705417",
+    "start": 27.28,
+    "end": 30.85,
+    "duration": 3.57,
+    "sha256": "072889a887a5dee645284c2196412b3842e7cd1b98f9189018469d4cba2b5a30"
+  },
+  {
+    "actor": "chen",
+    "quote": "从此也打开了面向新世界的大门。",
+    "source": "https://www.bilibili.com/video/BV1Vx411d7oX/",
+    "start": 55.7,
+    "end": 58.6,
+    "duration": 2.9,
+    "sha256": "8a89922a45184a82c232549c1167a9627a981ba3671291ee31c5fe51253b142b"
+  },
+  {
+    "actor": "pony",
+    "quote": "我们转型的原则是开放和分享。",
+    "source": "https://www.bilibili.com/video/BV14b411B7ok/",
+    "start": 53.66,
+    "end": 56.9,
+    "duration": 3.24,
+    "sha256": "42b730e0965e87a56da569f127d9308d7644f0e929d426c16e652ac08efd23db"
+  },
+  {
+    "actor": "wang",
+    "quote": "如果你想创业，赶紧来北京！",
+    "source": "https://www.bilibili.com/video/BV1Z54y1C7jN/",
+    "start": 150.08,
+    "end": 153.17,
+    "duration": 3.0896598639455783,
+    "sha256": "79af83598452f89c16fd79d75d59a9c02a06297f1bf4cda5896677591665f85a"
+  },
+  {
+    "actor": "zhou",
+    "quote": "但是我要泼点冷水。",
+    "source": "https://m.jiemian.com/audio/AGQCNQhmB2IBOg==.html",
+    "start": 2.24,
+    "end": 3.84,
+    "duration": 1.6,
+    "sha256": "9b4dd4e8e555d3afd41e28b66beb0191e19e88b517f031115b7f61ea9c8e7256"
+  }
+]

@@ -11,15 +11,15 @@ export const BATTERY_RADIUS = 16
 export const STEP = 1 / 120
 
 export const CAST = {
-  zhang: { name: '张一鸣', color: '#f16b84', light: '#ffdfdf', line: '不要让跳动停下来！' },
-  ma: { name: '马云', color: '#9877df', light: '#ebe2ff', line: '996！' },
-  liu: { name: '刘强东', color: '#f9a44c', light: '#ffe8c4', line: '兄弟，你的快递到了！' },
-  chen: { name: '陈睿', color: '#36b9df', light: '#dcf5ff', line: '下次一定跑得掉！' },
-  pony: { name: '马化腾', color: '#4b76df', light: '#dce6ff', line: '你要不要 Q 币呀？' },
-  lei: { name: '雷军', color: '#ed6f3b', light: '#ffe1ce', line: '准备好，再来一局！' },
-  li: { name: '李彦宏', color: '#29aa83', light: '#d4f5e9', line: '已为你找到复活点！' },
-  wang: { name: '王兴', color: '#d69e1c', light: '#fff0b3', line: '订单已送达！' },
-  zhou: { name: '周鸿祎', color: '#cf4b62', light: '#fbd4df', line: '发现小电视，立即拦截！' },
+  zhang: { name: '张一鸣', color: '#f16b84', light: '#ffdfdf', line: "你对事情的理解，就是你在这件事情上的竞争力。" },
+  ma: { name: '马云', color: '#9877df', light: '#ebe2ff', line: "我对钱没有兴趣。" },
+  liu: { name: '刘强东', color: '#f9a44c', light: '#ffe8c4', line: "我跟她在一起不是因为她漂亮，因为我根本不知道她漂不漂亮。" },
+  chen: { name: '陈睿', color: '#36b9df', light: '#dcf5ff', line: "从此也打开了面向新世界的大门。" },
+  pony: { name: '马化腾', color: '#4b76df', light: '#dce6ff', line: "我们转型的原则是开放和分享。" },
+  lei: { name: '雷军', color: '#ed6f3b', light: '#ffe1ce', line: "台风来的时候，连猪都可以飞。" },
+  li: { name: '李彦宏', color: '#29aa83', light: '#d4f5e9', line: "What's your problem?" },
+  wang: { name: '王兴', color: '#d69e1c', light: '#fff0b3', line: "如果你想创业，赶紧来北京！" },
+  zhou: { name: '周鸿祎', color: '#cf4b62', light: '#fbd4df', line: "但是我要泼点冷水。" },
 } as const
 
 export type CastId = keyof typeof CAST

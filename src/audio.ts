@@ -35,6 +35,14 @@ export class Sound {
   private musicGain?: GainNode
   private music?: AudioBufferSourceNode
   private gameplayStarted = false
+  private speaking?: { actor: CastId; ends: number; wallEnds: number }
+  get speakingActor() {
+    const cue = this.speaking
+    if (!cue) return undefined
+    const active = this.context?.state === 'running'
+      ? this.context.currentTime < cue.ends : performance.now() < cue.wallEnds
+    return active ? cue.actor : undefined
+  }
   private voice?: AudioBufferSourceNode
   private unlocking?: Promise<void>
 
@@ -200,12 +208,18 @@ export class Sound {
   caught(actor: CastId) {
     const ctx = this.context
     const output = this.master
-    if (ctx?.state !== 'running' || !output || this.muted) return
-
     const voice = this.buffers[actor] ?? this.buffers.hit
+    if (ctx?.state !== 'running' || !output || this.muted) {
+      const duration = voice?.duration ?? 3
+      this.speaking = { actor, ends: (ctx?.currentTime ?? 0) + duration, wallEnds: performance.now() + duration * 1000 }
+      return
+    }
+
+    this.speaking = undefined
     const playVoice = () => {
       if (!voice || this.muted) return
       this.playCatchAudio(ctx, output, voice, 0, voice.duration)
+      this.speaking = { actor, ends: ctx.currentTime + voice.duration, wallEnds: performance.now() + voice.duration * 1000 }
     }
     const music = this.buffers.music
     const { start, end } = AUDIO.catchClip
@@ -230,6 +244,7 @@ export class Sound {
       gain.disconnect()
       if (this.voice === source) {
         this.voice = undefined
+        this.speaking = undefined
         this.setMusicVolume(AUDIO.musicVolume, .20)
         after?.()
       }

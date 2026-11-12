@@ -227,7 +227,7 @@ export class Renderer {
     }
   }
 
-  draw(game: Game, time: number, impact: number) {
+  draw(game: Game, time: number, impact: number, speaking?: CastId) {
     const c = this.c
     const { width: w, height: h } = WORLD
     const scale = Math.min(window.devicePixelRatio || 1, 3)
@@ -300,6 +300,32 @@ export class Renderer {
     }
 
     drawTV(c, game, time)
+    const speaker = game.enemies.find(enemy => enemy.id === speaking)
+    if (speaker) {
+      const info = CAST[speaker.id]
+      const lines: string[] = []
+      let current = ''
+      for (const char of info.line) {
+        current += char
+        if (current.length >= 15) { lines.push(current); current = '' }
+      }
+      if (current) lines.push(current)
+      const bw = Math.max(140, Math.max(...lines.map(text => text.length)) * 17 + 28)
+      const bh = lines.length * 24 + 20
+      const { x, y } = speaker.position
+      const left = Math.max(8, Math.min(w - bw - 8, x - bw / 2))
+      const above = y > bh + 48
+      const top = above ? y - 44 - bh : y + 44
+      const tip = Math.max(left + 16, Math.min(left + bw - 16, x))
+      c.beginPath()
+      c.moveTo(tip - 9, above ? top + bh : top)
+      c.lineTo(x, above ? y - 31 : y + 31)
+      c.lineTo(tip + 9, above ? top + bh : top)
+      c.fillStyle = info.light
+      c.fill()
+      round(c, left, top, bw, bh, 12, info.light, INK, 2)
+      lines.forEach((text, index) => label(c, text, left + bw / 2, top + 22 + index * 24, 16, INK))
+    }
     if (impact > 0 && game.lastCaught) {
       const { x, y } = game.lastCaught
       c.globalAlpha = impact * .8

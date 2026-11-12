@@ -369,11 +369,12 @@ def character_voices(browser):
     page.evaluate("audioProbe.deny = false")
     page.get_by_role("button", name="开启游戏声音").click()
     expect(page.get_by_role("button", name="静音", exact=True)).to_have_attribute("aria-pressed", "false")
-    fixtures = [
-        (1, "catch", "zhang", "张一鸣：「不要让跳动停下来！」"),
-        (3, "ma", "ma", "马云：「996！」"),
-        (5, "pony", "pony", "马化腾：「你要不要 Q 币呀？」"),
-    ]
+    quotes = {item['actor']: item['quote'] for item in json.loads(
+        (Path(__file__).parents[1] / 'public/voices/sources.json').read_text(encoding='utf-8'))}
+    fixtures = [(1, 'catch', 'zhang', f"张一鸣：「{quotes['zhang']}」"),
+                (3, 'ma', 'ma', f"马云：「{quotes['ma']}」"),
+                (5, 'pony', 'pony', f"马化腾：「{quotes['pony']}」")]
+
     current_stage = 1
     for n, (level, route, actor, caption) in enumerate(fixtures, 1):
         while current_stage < level:
@@ -393,6 +394,48 @@ def character_voices(browser):
     print("Browser: each requested collision selects its own packaged voice and matching caption")
 
 
+def quote_bubbles(browser):
+    page, errors = open_game(browser, audio="voices")
+    page.evaluate("audioProbe.deny = false")
+    page.get_by_role("button", name="开启游戏声音").click()
+    result = page.evaluate("""async () => {
+      const {Sound} = await import('/src/audio.ts');
+      const {Game} = await import('/src/game.ts');
+      const {CAST, LEVELS} = await import('/src/levels.ts');
+      const {Renderer} = await import('/src/render.ts');
+      const sound = new Sound(() => {});
+      await sound.preload(); sound.enable();
+      await sound.context.resume();
+      const canvas = document.querySelector('#map');
+      const renderer = new Renderer(canvas), game = new Game([LEVELS[7]]);
+      const ctx = canvas.getContext('2d'), fill = ctx.fillText.bind(ctx);
+      let text = [];
+      ctx.fillText = (value, ...args) => { text.push(value); fill(value, ...args); };
+      const checks = [];
+      for (const [id, info] of Object.entries(CAST)) {
+        sound.caught(id); text = [];
+        renderer.draw(game, 0, 0, sound.speakingActor);
+        const rows = Math.ceil(info.line.length / 15);
+        checks.push(sound.speakingActor === id && text.slice(-rows).join('') === info.line
+          && audioProbe.starts.at(-1).duration === sound.buffers[id].duration);
+      }
+      sound.toggleMute(); sound.caught('liu'); text = [];
+      renderer.draw(game, 0, 0, sound.speakingActor);
+      checks.push(sound.speakingActor === 'liu');
+      sound.toggleMute(); sound.caught('ma');
+      await new Promise(resolve => setTimeout(resolve, (sound.buffers.ma.duration + .5) * 1000));
+      checks.push(sound.speakingActor === undefined);
+      sound.toggleMute(); sound.caught('liu');
+      renderer.draw(game, 0, 0, sound.speakingActor);
+      return checks;
+    }""")
+    assert all(result), result
+    page.screenshot(path="D:/Codex/voice-research/quote-bubble.png")
+    assert not errors, errors
+    page.close()
+    print("Browser: all nine original clips match bubble captions, replace cleanly, expire, and support mute")
+
+
 if __name__ == "__main__":
     with sync_playwright() as playwright:
         browser = playwright.chromium.launch(
@@ -405,5 +448,6 @@ if __name__ == "__main__":
             sound_and_retries(browser)
             batteries_and_pulse(browser)
             character_voices(browser)
+            quote_bubbles(browser)
         finally:
             browser.close()
