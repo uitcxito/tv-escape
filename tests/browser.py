@@ -104,13 +104,15 @@ def open_game(browser, audio=None):
     page.on("pageerror", lambda error: errors.append(str(error)))
     if audio:
         page.add_init_script(AUDIO_PROBE)
-    if audio == "signals":
-        signals = {"music": wav(440, .2), "hit": wav(990, 1.4)}
-        for track, payload in signals.items():
-            page.route(f"**/audio/{track}.mp3",
+    if audio in (None, "wave-music"):
+        page.route("**/audio/music.*", lambda route: route.fulfill(status=404, body="missing"))
+    if audio in ("signals", "wave-music"):
+        music = "music.wav" if audio == "wave-music" else "music.mp3"
+        signals = {music: wav(440, .2), "hit.mp3": wav(990, 1.4)}
+        for filename, payload in signals.items():
+            page.route(f"**/audio/{filename}",
                        lambda route, _request=None, body=payload: route.fulfill(body=body, content_type="audio/wav"))
     if audio is None:
-        page.route("**/audio/music.mp3", lambda route: route.fulfill(status=404, body="missing"))
         page.route("**/audio/hit.mp3", lambda route: route.fulfill(body="corrupt", content_type="audio/mpeg"))
     if audio != "voices":
         page.route("**/voices/*.wav", lambda route: route.fulfill(status=404, body="missing"))
@@ -258,6 +260,38 @@ def pause_and_resize(browser):
     print("Browser: pause, resume, blur, held keys cleared, resize, M shortcut")
 
 
+def music_follows_game_start(browser):
+    page, errors = open_game(browser, audio="wave-music")
+    page.evaluate("audioProbe.deny = false")
+    page.get_by_role("button", name="开启游戏声音").click()
+    expect(page.get_by_role("button", name="静音", exact=True)).to_have_attribute("aria-pressed", "false")
+    expect(page.locator("#hint")).to_have_text("WASD 移动")
+    assert page.evaluate("audioProbe.starts.filter(source => source.loop).length") == 0
+
+    page.keyboard.press("Escape")
+    page.keyboard.press("w")
+    expect(page.get_by_role("heading", name="游戏暂停")).to_be_visible()
+    assert page.evaluate("audioProbe.starts.filter(source => source.loop).length") == 0
+    page.keyboard.press("Escape")
+
+    page.keyboard.press("d")
+    page.wait_for_function("audioProbe.starts.filter(source => source.loop).length === 1", polling=25)
+    for route in ROUTES["stages"]:
+        drive(page, route)
+    expect(page.get_by_role("heading", name="成功逃出！")).to_be_visible()
+    assert page.evaluate("audioProbe.starts.filter(source => source.loop).length") == 1
+
+    page.get_by_role("button", name="再玩一次").click()
+    expect(page.locator("#hint")).to_have_text("WASD 移动")
+    assert page.evaluate("audioProbe.stops.filter(source => source.loop).length") == 1
+    assert page.evaluate("audioProbe.starts.filter(source => source.loop).length") == 1
+    page.keyboard.press("a")
+    page.wait_for_function("audioProbe.starts.filter(source => source.loop).length === 2", polling=25)
+    assert not errors, errors
+    page.close()
+    print("Browser: local music waits for WASD, loops across stages, and restarts after replay")
+
+
 def sound_and_retries(browser):
     page, errors = open_game(browser, audio="signals")
     page.keyboard.down("s")
@@ -358,6 +392,7 @@ if __name__ == "__main__":
         try:
             playthrough(browser)
             pause_and_resize(browser)
+            music_follows_game_start(browser)
             sound_and_retries(browser)
             batteries_and_pulse(browser)
             character_voices(browser)

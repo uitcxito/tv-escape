@@ -31,9 +31,9 @@ npm run preview
 
 碰撞时，最先接触小电视的角色会触发自己的音效、普通话合成配音和字幕。录音位于 [`public/voices/`](public/voices)，字幕为游戏台词。
 
-背景原曲仍需单独接入。[Audio.com 候选](https://audio.com/josh-hamilton/audio/mc-hammer-u-can-t-touch-this-kc10122018)由 Josh Hamilton 上传，点击下载时要求登录，页面未确认游戏使用授权。取得音源后，按 [音频目录说明](public/audio/README.md)放入 `public/audio/music.mp3` 并重新加载页面。生产包需重新构建。
+背景原曲仍需单独接入。取得可使用的 MC Hammer 原曲后，保留原有格式，按 [音频目录说明](public/audio/README.md)放入 `public/audio/` 并重新加载页面。生产包需重新构建。Audio.com 候选的下载入口要求登录。Qobuz 商店列出时长 4:16 的 1990 年 Capitol Records 录音。[Audio.com 候选](https://audio.com/josh-hamilton/audio/mc-hammer-u-can-t-touch-this-kc10122018) · [Qobuz 原专辑](https://www.qobuz.com/us-en/album/please-hammer-dont-hurt-em-mc-hammer/jfhc5esybkfqb)
 
-第一次按 WASD 或点击顶部的“开启声音”会启用声音。角色配音在被追上时播放。如果浏览器阻止播放，可点地图右下角的“开启声音”重试。音量和文件路径在 `src/audio.ts`，关卡和台词在 `src/levels.ts`。
+第一次按 WASD 或点击顶部的“开启声音”会启用声音。按 WASD 开始追逐后，背景原曲从头循环播放。点“再玩一次”后，下次开跑会重新从曲首播放。角色配音在被追上时播放。如果浏览器阻止播放，可点地图右下角的“开启声音”重试。音量和文件路径在 `src/audio.ts`，关卡和台词在 `src/levels.ts`。
 
 ## 验证
 

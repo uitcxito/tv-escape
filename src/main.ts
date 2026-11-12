@@ -193,6 +193,7 @@ action.addEventListener('click', () => {
   if (game.mode === 'won') {
     down.clear()
     game.restart()
+    sound.resetGameplayMusic()
     accumulated = impact = toast = 0
     feedback.hidden = true
     sync()
@@ -206,6 +207,7 @@ window.addEventListener('keydown', e => {
     if (!e.repeat) sound.enable()
     if (game.mode === 'ready' && !e.repeat) {
       game.start()
+      sound.startGameplayMusic()
       accumulated = 0
     }
     if (game.mode === 'running' && !e.repeat) down.add(e.code)

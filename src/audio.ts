@@ -2,7 +2,7 @@ import { CAST } from './levels'
 import type { CastId } from './levels'
 
 const AUDIO = {
-  music: 'audio/music.mp3',
+  music: ['audio/music.mp3', 'audio/music.flac', 'audio/music.m4a', 'audio/music.wav'],
   hit: 'audio/hit.mp3',
   musicVolume: .42,
   duckVolume: .10,
@@ -11,10 +11,10 @@ const AUDIO = {
 
 type Track = 'music' | 'hit' | CastId
 type Availability = 'loading' | 'ready' | 'missing'
-const TRACKS: readonly (readonly [Track, string])[] = [
+const TRACKS: readonly (readonly [Track, readonly string[]])[] = [
   ['music', AUDIO.music],
-  ['hit', AUDIO.hit],
-  ...(Object.keys(CAST) as CastId[]).map(id => [id, `voices/${id}.wav`] as const),
+  ['hit', [AUDIO.hit]],
+  ...(Object.keys(CAST) as CastId[]).map(id => [id, [`voices/${id}.wav`]] as const),
 ]
 
 const EFFECTS = {
@@ -32,6 +32,7 @@ export class Sound {
   private master?: GainNode
   private musicGain?: GainNode
   private music?: AudioBufferSourceNode
+  private gameplayStarted = false
   private voice?: AudioBufferSourceNode
   private unlocking?: Promise<void>
 
@@ -60,20 +61,27 @@ export class Sound {
       this.changed()
       return
     }
-    await Promise.all(TRACKS.map(async ([track, path]) => {
-      try {
-        const url = new URL(import.meta.env.BASE_URL + path, document.baseURI)
-        const response = await fetch(url, { signal: AbortSignal.timeout(12000) })
-        if (!response.ok || response.headers.get('Content-Type')?.includes('text/html')) {
-          throw new Error('Audio asset missing')
-        }
-        const data = await response.arrayBuffer()
-        this.buffers[track] = await decoder.decodeAudioData(data)
-        this.availability.set(track, 'ready')
-        if (track === 'music') this.startMusic()
-      } catch { this.availability.set(track, 'missing') }
+    await Promise.all(TRACKS.map(async ([track, paths]) => {
+      const buffer = await this.loadBuffer(decoder, paths)
+      this.availability.set(track, buffer ? 'ready' : 'missing')
+      if (buffer) this.buffers[track] = buffer
+      if (track === 'music' && buffer) this.startMusic()
       this.changed()
     }))
+  }
+
+  private async loadBuffer(decoder: OfflineAudioContext, paths: readonly string[]) {
+    const signal = AbortSignal.timeout?.(12000)
+    for (const path of paths) {
+      try {
+        const url = new URL(import.meta.env.BASE_URL + path, document.baseURI)
+        const response = await fetch(url, { signal })
+        if (!response.ok || response.headers.get('Content-Type')?.includes('text/html')) continue
+        return await decoder.decodeAudioData(await response.arrayBuffer())
+      } catch {
+        // A file can be absent or undecodable. Try the next local format.
+      }
+    }
   }
 
   enable() {
@@ -123,6 +131,19 @@ export class Sound {
     this.changed()
   }
 
+  startGameplayMusic() {
+    this.gameplayStarted = true
+    this.startMusic()
+  }
+
+  resetGameplayMusic() {
+    this.gameplayStarted = false
+    if (!this.music) return
+    this.music.stop()
+    this.music.disconnect()
+    this.music = undefined
+  }
+
   effect(kind: keyof typeof EFFECTS) {
     const ctx = this.context
     if (ctx?.state !== 'running' || !this.master || this.muted) return
@@ -147,7 +168,7 @@ export class Sound {
   }
 
   private startMusic() {
-    if (this.context?.state !== 'running' || !this.musicGain || !this.buffers.music || this.music) return
+    if (!this.gameplayStarted || this.context?.state !== 'running' || !this.musicGain || !this.buffers.music || this.music) return
     const source = this.context.createBufferSource()
     source.buffer = this.buffers.music
     source.loop = true
