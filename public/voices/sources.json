@@ -6,7 +6,13 @@
     "start": 25.92,
     "end": 27.35,
     "duration": 1.43,
-    "sha256": "a0faed665920b385b53f692ad98fa42a7e618a0b0441513efee65c9671386791"
+    "sha256": "c25bd40ab01ecb2a322babf56640b3079e6eb3041df92b12213fafca24a75c2d",
+    "processing": {
+      "method": "UVR_MDXNET_Main vocal isolation (positive/negative denoise), 75 Hz high-pass, -21 LUFS normalization",
+      "model_md5": "1284cfb6ca5cbe68778a392bf92fe448",
+      "original_sha256": "a0faed665920b385b53f692ad98fa42a7e618a0b0441513efee65c9671386791",
+      "model_source": "https://huggingface.co/notabilia/uvr5-models/blob/main/UVR_MDXNET_Main.onnx"
+    }
   },
   {
     "actor": "liu",
@@ -15,7 +21,13 @@
     "start": 3.48,
     "end": 6.6,
     "duration": 3.12,
-    "sha256": "fc7a39add3eaed2790be2468d8c946fe1badc0c3429c8b2e84b877f59a938f53"
+    "sha256": "887e83714e7330216add4af9287c6a7ef75a8d885534b55713e21b72d4acf6d4",
+    "processing": {
+      "method": "UVR_MDXNET_Main vocal isolation (positive/negative denoise), 75 Hz high-pass, -21 LUFS normalization",
+      "model_md5": "1284cfb6ca5cbe68778a392bf92fe448",
+      "original_sha256": "fc7a39add3eaed2790be2468d8c946fe1badc0c3429c8b2e84b877f59a938f53",
+      "model_source": "https://huggingface.co/notabilia/uvr5-models/blob/main/UVR_MDXNET_Main.onnx"
+    }
   },
   {
     "actor": "lei",
@@ -24,7 +36,13 @@
     "start": 668,
     "end": 671.5,
     "duration": 3.5,
-    "sha256": "23256b7dfbc987655b621c8bf1bb33530a3420e273f7d0b38444c02f075a2bdc"
+    "sha256": "9b348429d2302bc659f6413de4697ef5be20e1c9d9a3af0e38f8954ebf606c1f",
+    "processing": {
+      "method": "UVR_MDXNET_Main vocal isolation (positive/negative denoise), 75 Hz high-pass, -21 LUFS normalization",
+      "model_md5": "1284cfb6ca5cbe68778a392bf92fe448",
+      "original_sha256": "23256b7dfbc987655b621c8bf1bb33530a3420e273f7d0b38444c02f075a2bdc",
+      "model_source": "https://huggingface.co/notabilia/uvr5-models/blob/main/UVR_MDXNET_Main.onnx"
+    }
   },
   {
     "actor": "li",
@@ -33,7 +51,13 @@
     "start": 1.8,
     "end": 4.1,
     "duration": 2.3,
-    "sha256": "0b4dfdd05a01f6f125b3b6c75b07227caf1310206ae1ba6d11db87f8c6defc3e"
+    "sha256": "cd44bcad506298d56fff30a6b45f2282282b3784d827faef884fa97d4a297c50",
+    "processing": {
+      "method": "UVR_MDXNET_Main vocal isolation (positive/negative denoise), 75 Hz high-pass, -21 LUFS normalization",
+      "model_md5": "1284cfb6ca5cbe68778a392bf92fe448",
+      "original_sha256": "0b4dfdd05a01f6f125b3b6c75b07227caf1310206ae1ba6d11db87f8c6defc3e",
+      "model_source": "https://huggingface.co/notabilia/uvr5-models/blob/main/UVR_MDXNET_Main.onnx"
+    }
   },
   {
     "actor": "zhang",
@@ -42,7 +66,13 @@
     "start": 27.28,
     "end": 30.85,
     "duration": 3.57,
-    "sha256": "072889a887a5dee645284c2196412b3842e7cd1b98f9189018469d4cba2b5a30"
+    "sha256": "55920b64e336b6d025d132dc15ab3580ad0c1ba712283f273ef2d59e0e0b93f3",
+    "processing": {
+      "method": "UVR_MDXNET_Main vocal isolation (positive/negative denoise), 75 Hz high-pass, -21 LUFS normalization",
+      "model_md5": "1284cfb6ca5cbe68778a392bf92fe448",
+      "original_sha256": "072889a887a5dee645284c2196412b3842e7cd1b98f9189018469d4cba2b5a30",
+      "model_source": "https://huggingface.co/notabilia/uvr5-models/blob/main/UVR_MDXNET_Main.onnx"
+    }
   },
   {
     "actor": "chen",
@@ -51,7 +81,13 @@
     "start": 55.7,
     "end": 58.6,
     "duration": 2.9,
-    "sha256": "8a89922a45184a82c232549c1167a9627a981ba3671291ee31c5fe51253b142b"
+    "sha256": "88cfe464bfb93917e05246af7987d6bce57f482ac540c0f440cc6be249b03683",
+    "processing": {
+      "method": "UVR_MDXNET_Main vocal isolation (positive/negative denoise), 75 Hz high-pass, -21 LUFS normalization",
+      "model_md5": "1284cfb6ca5cbe68778a392bf92fe448",
+      "original_sha256": "8a89922a45184a82c232549c1167a9627a981ba3671291ee31c5fe51253b142b",
+      "model_source": "https://huggingface.co/notabilia/uvr5-models/blob/main/UVR_MDXNET_Main.onnx"
+    }
   },
   {
     "actor": "pony",
@@ -60,7 +96,13 @@
     "start": 53.66,
     "end": 56.9,
     "duration": 3.24,
-    "sha256": "42b730e0965e87a56da569f127d9308d7644f0e929d426c16e652ac08efd23db"
+    "sha256": "63a5d519de0983133b81aaea0ac4913fb12c354fd64981a83e9c43ca099444a2",
+    "processing": {
+      "method": "UVR_MDXNET_Main vocal isolation (positive/negative denoise), 75 Hz high-pass, -21 LUFS normalization",
+      "model_md5": "1284cfb6ca5cbe68778a392bf92fe448",
+      "original_sha256": "42b730e0965e87a56da569f127d9308d7644f0e929d426c16e652ac08efd23db",
+      "model_source": "https://huggingface.co/notabilia/uvr5-models/blob/main/UVR_MDXNET_Main.onnx"
+    }
   },
   {
     "actor": "wang",
@@ -69,7 +111,13 @@
     "start": 150.08,
     "end": 153.17,
     "duration": 3.0896598639455783,
-    "sha256": "79af83598452f89c16fd79d75d59a9c02a06297f1bf4cda5896677591665f85a"
+    "sha256": "8f47eaa9b97b74f6ffd7958e676ce8217f766094c1b511f5e9cde00ac6bcd35a",
+    "processing": {
+      "method": "UVR_MDXNET_Main vocal isolation (positive/negative denoise), 75 Hz high-pass, -21 LUFS normalization",
+      "model_md5": "1284cfb6ca5cbe68778a392bf92fe448",
+      "original_sha256": "79af83598452f89c16fd79d75d59a9c02a06297f1bf4cda5896677591665f85a",
+      "model_source": "https://huggingface.co/notabilia/uvr5-models/blob/main/UVR_MDXNET_Main.onnx"
+    }
   },
   {
     "actor": "zhou",
@@ -78,6 +126,12 @@
     "start": 2.24,
     "end": 3.84,
     "duration": 1.6,
-    "sha256": "9b4dd4e8e555d3afd41e28b66beb0191e19e88b517f031115b7f61ea9c8e7256"
+    "sha256": "e9a8206cc6b189ff6e029fb0285e3f394da900c40b8b1d377cec06672ce1353c",
+    "processing": {
+      "method": "UVR_MDXNET_Main vocal isolation (positive/negative denoise), 75 Hz high-pass, -21 LUFS normalization",
+      "model_md5": "1284cfb6ca5cbe68778a392bf92fe448",
+      "original_sha256": "9b4dd4e8e555d3afd41e28b66beb0191e19e88b517f031115b7f61ea9c8e7256",
+      "model_source": "https://huggingface.co/notabilia/uvr5-models/blob/main/UVR_MDXNET_Main.onnx"
+    }
   }
 ]

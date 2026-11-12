@@ -7,7 +7,7 @@ const AUDIO = {
   // Opening vocal in the local album version, before the instrumental starts.
   catchClip: { start: .50, end: 1.31 },
   musicVolume: .42,
-  duckVolume: .10,
+  duckVolume: 0,
   voiceVolume: .95,
 } as const
 

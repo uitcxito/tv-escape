@@ -324,7 +324,7 @@ def sound_and_retries(browser):
     page.wait_for_function("audioProbe.starts.at(-1).duration > 2.19 && audioProbe.starts.at(-1).offset === 0",
                            polling=25)
     assert page.evaluate("audioProbe.starts.at(-1).time - audioProbe.starts.at(-2).time >= .79")
-    page.wait_for_function("audioProbe.spectrum()?.[2] > -40", polling=25)
+    page.wait_for_function("audioProbe.spectrum()?.[2] > -40 && audioProbe.spectrum()?.[0] < -90", polling=25)
     stage(page, 1)
     page.wait_for_function(f"audioProbe.spectrum()?.[0] > {music - 3} && audioProbe.spectrum()?.[1] < -90", polling=25)
     page.keyboard.press("m")
