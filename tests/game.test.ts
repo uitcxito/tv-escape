@@ -2,17 +2,19 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { Game, MAX_CHARGES } from '../src/game'
 import { BATTERY_RADIUS, CAST, ENEMY_RADIUS, EXIT_RADIUS, LEVELS, PLAYER_RADIUS, PLAYER_SPEED, STEP } from '../src/levels'
-import { add, boardDistance, cast, dot, isClear, length, MAX_TURN, meet, move, rebound, sub, unit, v } from '../src/physics'
+import { buildMaze, cellAt, CELL_SIZE, mazeDistances } from '../src/maze'
+import { add, boardDistance, cast, dot, isClear, length, MAX_TURN, meet, move, mul, rebound, sub, unit, v } from '../src/physics'
 import type { Arena, Board, Vec } from '../src/physics'
 
 const empty = { width: 1000, height: 1000, boards: [] }
+const openLevel = { ...LEVELS[0], ...empty, maze: undefined }
 const diagonal: Board = { a: v(220, 220), b: v(440, 440), radius: 16, tone: 0 }
 const slanted: Arena = { ...empty, boards: [diagonal] }
 const close = (actual: number, expected: number) => assert.ok(Math.abs(actual - expected) < 1e-7, `${actual} ≠ ${expected}`)
 
 test('WASD has the same speed on cardinal and diagonal input, at 260 units/s', () => {
   for (const input of [v(1, 0), v(1, 1), v(0, -1)]) {
-    const game = new Game([{ ...LEVELS[0], ...empty, player: v(430, 430), exit: v(900, 900), enemies: [] }])
+    const game = new Game([{ ...openLevel, player: v(430, 430), exit: v(900, 900), enemies: [] }])
     const initial = game.player
     game.start()
     for (let i = 0; i < 120; i++) game.tick(input)
@@ -83,6 +85,7 @@ test('two simultaneous catches reset once, restore fixed spawns and velocities, 
   const game = new Game()
   game.index = 3
   const reference = new Game([game.level])
+  game.player = reference.player
   game.start()
   game.enemies = reference.enemies.map(e => ({ ...e, position: game.player, delay: 0, trail: [v(14, 13)] }))
   assert.deepEqual(game.tick(v()), { type: 'catch', actor: 'zhang' })
@@ -104,23 +107,23 @@ test('two simultaneous catches reset once, restore fixed spawns and velocities, 
 })
 
 test('the first actor to touch the player provides the collision cue, regardless of roster order', () => {
-  const game = new Game([{ ...LEVELS[0], ...empty, player: v(400, 400) }])
+  const game = new Game([{ ...openLevel, player: v(400, 400) }])
   game.start()
   game.enemies = [
-    { id: 'ma', position: v(453.5, 400), velocity: v(-240, 0), trail: [], delay: 0, disrupted: 0 },
-    { id: 'pony', position: v(347.25, 400), velocity: v(240, 0), trail: [], delay: 0, disrupted: 0 },
+    { id: 'ma', position: v(453.5, 400), velocity: v(-240, 0), trail: [], delay: 0, disrupted: 0, reaction: 0 },
+    { id: 'pony', position: v(347.25, 400), velocity: v(240, 0), trail: [], delay: 0, disrupted: 0, reaction: 0 },
   ]
   assert.deepEqual(game.tick(v()), { type: 'catch', actor: 'pony' })
   assert.equal(game.attempts, 1)
 })
 
 test('a pulse spends one charge, repels a nearby chaser, and gives temporary protection', () => {
-  const game = new Game([{ ...LEVELS[0], ...empty, player: v(400, 400), enemies: [] }])
+  const game = new Game([{ ...openLevel, player: v(400, 400), enemies: [] }])
   assert.equal(game.releasePulse(), undefined)
   game.start()
   game.enemies = [
-    { id: 'zhang', position: v(450, 400), velocity: v(-140, 0), trail: [], delay: 0, disrupted: 0 },
-    { id: 'ma', position: v(600, 400), velocity: v(140, 0), trail: [], delay: 0, disrupted: 0 },
+    { id: 'zhang', position: v(450, 400), velocity: v(-140, 0), trail: [], delay: 0, disrupted: 0, reaction: 0 },
+    { id: 'ma', position: v(600, 400), velocity: v(140, 0), trail: [], delay: 0, disrupted: 0, reaction: 0 },
   ]
   assert.equal(game.releasePulse(), 1)
   assert.equal(game.charge, 0)
@@ -148,14 +151,14 @@ test('a pulse spends one charge, repels a nearby chaser, and gives temporary pro
 
 test('collecting batteries is optional, caps charges, and keeps credit when a player retries', () => {
   const game = new Game([{
-    ...LEVELS[0], ...empty, player: v(400, 400), exit: v(660, 400),
+    ...openLevel, player: v(400, 400), exit: v(660, 400),
     enemies: [], batteries: [v(440, 400), v(550, 400)],
   }])
   game.start()
   assert.deepEqual(game.tick(v(1, 0)), { type: 'pickup', charged: true })
   assert.equal(game.charge, 2)
   game.enemies = [
-    { id: 'zhang', position: game.player, velocity: v(-140, 0), trail: [], delay: 0, disrupted: 0 },
+    { id: 'zhang', position: game.player, velocity: v(-140, 0), trail: [], delay: 0, disrupted: 0, reaction: 0 },
   ]
   assert.deepEqual(game.tick(v()), { type: 'catch', actor: 'zhang' })
   assert.equal(game.batteriesFound, 1)
@@ -175,7 +178,7 @@ test('collecting batteries is optional, caps charges, and keeps credit when a pl
   assert.deepEqual(game.tick(v()), { type: 'win' }, 'the exit opens with zero batteries collected')
 })
 
-test('staggered chasers wait through the start and the finale allows a straight opening', () => {
+test('staggered chasers wait through the start and the finale gives the player time to get moving', () => {
   const game = new Game([LEVELS[7]])
   game.start()
   assert.equal(game.charge, 2)
@@ -183,12 +186,12 @@ test('staggered chasers wait through the start and the finale allows a straight 
   const initial = delayed.position
   for (let i = 0; i < 36; i++) assert.notEqual(game.tick(v(1, 0))?.type, 'catch')
   assert.deepEqual(delayed.position, initial)
-  assert.ok(game.player.x > 190)
+  assert.ok(game.player.x > LEVELS[7].player.x + 70)
 
-  const demo = new Game([{ ...LEVELS[0], ...empty, player: v(400, 400), batteries: [], enemies: [] }])
+  const demo = new Game([{ ...openLevel, player: v(400, 400), batteries: [], enemies: [] }])
   demo.start()
   demo.enemies = [
-    { id: 'chen', position: demo.player, velocity: v(140, 0), trail: [], delay: .2, disrupted: 0 },
+    { id: 'chen', position: demo.player, velocity: v(140, 0), trail: [], delay: .2, disrupted: 0, reaction: 0 },
   ]
   for (let i = 0; i < 24; i++) assert.equal(demo.tick(v()), undefined)
   assert.deepEqual(demo.tick(v()), { type: 'catch', actor: 'chen' })
@@ -214,8 +217,8 @@ function reachable(arena: Arena, player: Vec, exit: Vec, permitted = (_p: Vec) =
   return false
 }
 
-test('all eight maps have safe spawns and reachable exits and batteries', () => {
-  assert.deepEqual(LEVELS.map(l => l.speed), [140, 160, 180, 185, 195, 208, 220, 232])
+test('all eight mazes have safe spawns, reachable exits and batteries, and walls between corridors', () => {
+  assert.ok(LEVELS.every((l, i) => l.speed < PLAYER_SPEED && (i === 0 || l.speed > LEVELS[i - 1].speed)))
   assert.deepEqual(LEVELS.map(l => l.enemies.length), [1, 1, 2, 3, 4, 5, 7, 9])
   assert.deepEqual(LEVELS[7].enemies.map(e => e.id), Object.keys(CAST))
   for (const [i, l] of LEVELS.entries()) {
@@ -226,14 +229,57 @@ test('all eight maps have safe spawns and reachable exits and batteries', () => 
       assert.ok(length(sub(e.position, l.player)) > PLAYER_RADIUS + ENEMY_RADIUS + 80)
       for (const other of l.enemies.slice(j + 1)) assert.ok(length(sub(e.position, other.position)) > ENEMY_RADIUS * 2)
     })
+    assert.ok(cast(l.player, sub(l.exit, l.player), PLAYER_RADIUS, l), `stage ${i + 1} blocks the direct route`)
+    const maze = l.maze!
+    assert.ok(mazeDistances(maze, cellAt(maze, l.player)).every(distance => distance >= 0))
+    for (const cell of maze.cells) {
+      for (const dir of cardinal) {
+        const offset = mul(dir, CELL_SIZE)
+        const neighbor = add(cell.center, offset)
+        if (neighbor.x < 0 || neighbor.y < 0 || neighbor.x >= l.width || neighbor.y >= l.height) continue
+        const connected = cell.neighbors.includes(cellAt(maze, neighbor))
+        assert.equal(!cast(cell.center, offset, ENEMY_RADIUS, l), connected, 'the maze graph matches the physical walls')
+      }
+    }
     assert.ok(reachable(l, l.player, l.exit), `stage ${i + 1} exit is reachable`)
     l.batteries.forEach((battery, j) => {
       assert.ok(isClear(battery, BATTERY_RADIUS, l), `stage ${i + 1} battery ${j + 1} is on open floor`)
       assert.ok(reachable(l, l.player, battery), `stage ${i + 1} battery ${j + 1} is reachable`)
     })
   }
-  assert.equal(cast(v(285, 296), v(551, 0), PLAYER_RADIUS, LEVELS[4]), undefined, 'stage 5 has a shortcut')
   const l = LEVELS[6]
   assert.ok(reachable(l, l.player, l.exit, p => p.y <= l.player.y))
   assert.ok(reachable(l, l.player, l.exit, p => p.y >= l.player.y))
+})
+
+test('a chaser turns before hitting a wall and follows the passage around it', () => {
+  const { maze, boards } = buildMaze([
+    '+---+---+---+',
+    '|       |   |',
+    '+---+   +   +',
+    '|           |',
+    '+---+---+---+',
+  ], 4)
+  const start = maze.cells[1].center
+  const player = maze.cells[2].center
+  const game = new Game([{
+    ...openLevel, width: 3 * CELL_SIZE, height: 2 * CELL_SIZE, maze, boards,
+    player, exit: maze.cells[3].center, batteries: [],
+    enemies: [{ id: 'zhang', position: start, heading: 0, delay: 0 }],
+  }])
+  game.start()
+  assert.ok(cast(start, sub(player, start), ENEMY_RADIUS, game.level))
+  assert.equal(game.tick(v()), undefined)
+  assert.equal(game.enemies[0].position.x, start.x)
+  assert.ok(game.enemies[0].position.y > start.y)
+  let wentAround = false
+  for (let i = 0; i < 360; i++) {
+    const event = game.tick(v())
+    if (event?.type === 'catch') break
+    const { position } = game.enemies[0]
+    assert.ok(isClear(position, ENEMY_RADIUS, game.level))
+    wentAround ||= position.x > 2 * CELL_SIZE && position.y > CELL_SIZE
+  }
+  assert.ok(wentAround)
+  assert.equal(game.attempts, 1)
 })

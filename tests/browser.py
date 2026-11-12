@@ -109,7 +109,7 @@ def open_game(browser, audio=None):
         page.route("**/audio/music.*", lambda route: route.fulfill(status=404, body="missing"))
     if audio in ("signals", "wave-music"):
         music = "music.wav" if audio == "wave-music" else "music.mp3"
-        signals = {music: wav(440, .2), "hit.mp3": wav(990, 1.4)}
+        signals = {music: wav(440, .2), "hit.mp3": wav(990, 2.2)}
         for filename, payload in signals.items():
             page.route(f"**/audio/{filename}",
                        lambda route, _request=None, body=payload: route.fulfill(body=body, content_type="audio/wav"))
@@ -186,7 +186,7 @@ def playthrough(browser):
                                polling=25)
         if i == 8:
             expect(page.locator("#roster-count")).to_have_text("追捕者 · 9 人")
-            expect(page.locator("#roster-speed")).to_have_text("232 单位/秒")
+            expect(page.locator("#roster-speed")).to_have_text("171 单位/秒")
             if os.environ.get("GAME_QA_DIR"):
                 page.screenshot(path=str(Path(os.environ["GAME_QA_DIR"]) / "stage-8.png"))
             page.set_viewport_size({"width": 1100, "height": 600})
@@ -195,7 +195,7 @@ def playthrough(browser):
         if i == 1:
             page.keyboard.down("d")
             frames(page, 1)
-            expect(page.locator("#hint")).to_have_text("躲开头像，注意反弹")
+            expect(page.locator("#hint")).to_have_text("注意路口，追捕者会转弯")
             frames(page, route[0][1] - 1)
             page.keyboard.up("d")
             drive(page, route[1:3])
@@ -223,10 +223,11 @@ def playthrough(browser):
 
 def pause_and_resize(browser):
     page, errors = open_game(browser)
+    initial = player_x(page)
     page.keyboard.down("d")
     frames(page, 24)
     x = player_x(page)
-    assert x > 160
+    assert x > initial + 40
     page.keyboard.press("Escape")
     frames(page, 24)
     assert abs(player_x(page) - x) < 1
@@ -295,8 +296,7 @@ def music_follows_game_start(browser):
 
 def sound_and_retries(browser):
     page, errors = open_game(browser, audio="signals")
-    page.keyboard.down("s")
-    page.keyboard.down("d")
+    page.keyboard.press("d")
     expect(page.get_by_role("button", name="开启声音")).to_be_visible()
     page.evaluate("audioProbe.deny = false")
     page.get_by_role("button", name="开启声音").click()
@@ -307,21 +307,19 @@ def sound_and_retries(browser):
     page.wait_for_timeout(700)
     music = page.evaluate("audioProbe.spectrum()[0]")
     assert music > -42, music
-    frames(page, ROUTES["catch"][0][1])
+    drive(page, ROUTES["catch"])
     expect(page.locator("#feedback")).to_contain_text("重新出发 · 1")
     page.wait_for_function("audioProbe.starts.length === 3 && audioProbe.spectrum()?.[1] > -40", polling=25)
     assert page.evaluate("audioProbe.starts.filter(s => s.loop).map(s => s.offset)") == [0, 0]
     assert page.evaluate("audioProbe.stops.filter(s => s.loop).length") == 1
     page.wait_for_function(f"audioProbe.spectrum()?.[0] < {music - 8}", polling=25)
-    frames(page, ROUTES["catch"][0][1])
+    drive(page, ROUTES["catch"])
     expect(page.locator("#feedback")).to_contain_text("重新出发 · 2")
     assert page.evaluate("audioProbe.starts.filter(s => s.loop).map(s => s.offset)") == [0, 0, 0]
     assert page.evaluate("audioProbe.stops.filter(s => s.loop).length") == 2
     assert page.evaluate("audioProbe.starts.filter(s => !s.loop).length") == 2
     assert page.evaluate("audioProbe.stops.filter(s => !s.loop).length") == 1
     stage(page, 1)
-    page.keyboard.up("s")
-    page.keyboard.up("d")
     page.wait_for_function(f"audioProbe.spectrum()?.[0] > {music - 3} && audioProbe.spectrum()?.[1] < -90", polling=25)
     page.keyboard.press("m")
     page.wait_for_function("audioProbe.spectrum()?.every(x => x < -90)", polling=25)
@@ -338,18 +336,18 @@ def batteries_and_pulse(browser):
     page.get_by_role("button", name="开启游戏声音").click()
     pulse = page.get_by_role("button", name="干扰脉冲（空格）")
     expect(pulse).to_have_attribute("aria-disabled", "true")
-    drive(page, [("D", 90)])
+    drive(page, ROUTES["pulse"][:1])
     expect(page.locator("#power-count")).to_have_text("剩余 2 次")
     expect(page.locator("#feedback")).to_contain_text("电池 +1")
     assert page.evaluate("audioProbe.effects") == 3
-    drive(page, [("SD", 96)])
+    drive(page, ROUTES["pulse"][1:])
     page.keyboard.press("Space")
     expect(page.locator("#feedback")).to_have_text("干扰命中 1 名 · 快溜！")
     expect(page.locator("#power-count")).to_have_text("剩余 1 次")
     assert page.evaluate("audioProbe.effects") == 5
     page.keyboard.press("Space")
     expect(page.locator("#power-count")).to_have_text("剩余 1 次")
-    drive(page, [("D", 72)])
+    drive(page, [("W", 72)])
     expect(page.locator("#feedback")).to_contain_text("快溜")
     pulse.click()
     expect(page.locator("#power-count")).to_have_text("剩余 0 次")

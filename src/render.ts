@@ -2,15 +2,11 @@ import { CAST, ENEMY_RADIUS, WORLD } from './levels'
 import type { CastId, Level } from './levels'
 import { PULSE_DURATION, PULSE_RADIUS } from './game'
 import type { Game } from './game'
+import { WALL_RADIUS } from './maze'
 import type { Board, Vec } from './physics'
 
 const INK = '#26233e'
 const MINT = '#87ecac'
-const PALETTES = [
-  ['#fff3bc', '#ffdc7e', '#e6ac4e'],
-  ['#ede1ff', '#cfb7f5', '#a789db'],
-  ['#ffe0df', '#ffb6bc', '#de8697'],
-]
 const TAU = Math.PI * 2
 
 export const portraitURL = (id: CastId) => `${import.meta.env.BASE_URL}portraits/${id}.webp`
@@ -49,37 +45,38 @@ function line(c: CanvasRenderingContext2D, points: number[], color: string, widt
   c.stroke()
 }
 
-function label(c: CanvasRenderingContext2D, text: string, x: number, y: number, size: number, color: string,
-  latin = false) {
+function label(c: CanvasRenderingContext2D, text: string, x: number, y: number, size: number, color: string) {
   c.fillStyle = color
-  c.font = latin ? `700 ${size}px Consolas, monospace` : `750 ${size}px "Microsoft YaHei", sans-serif`
+  c.font = `750 ${size}px "Microsoft YaHei", sans-serif`
   c.textAlign = 'center'
   c.textBaseline = 'middle'
   c.fillText(text, x, y)
 }
 
-function drawBoard(c: CanvasRenderingContext2D, b: Board) {
-  const dx = b.b.x - b.a.x
-  const dy = b.b.y - b.a.y
-  const len = Math.hypot(dx, dy)
-  const r = b.radius
-  const [light, fill, dark] = PALETTES[b.tone]
-  c.save()
-  c.translate(b.a.x, b.a.y + 4)
-  c.rotate(Math.atan2(dy, dx))
-  round(c, -r, -r + 3, len + 2 * r, 2 * r, r, '#29213b22')
-  c.translate(0, -4 * Math.cos(Math.atan2(dy, dx)))
-  c.translate(-4 * Math.sin(Math.atan2(dy, dx)), 0)
-  round(c, -r + 2, -r + 2, len + 2 * r - 4, 2 * r - 4, r - 2, dark, INK, 4)
-  round(c, -r + 4, -r + 4, len + 2 * r - 8, 2 * r - 13, r - 4, fill)
-  c.lineCap = 'round'
-  line(c, [12, -r + 7, len - 12, -r + 7], light, 2.5)
-  line(c, [28, 4, len * .51, 4], dark, 1.25)
-  line(c, [len * .68, 4, len - 28, 4], dark, 1.25)
-  for (const x of [2, len - 2]) {
-    disc(c, x, -1, 3.5, light, INK, 1.4)
-    line(c, [x - 1.6, -1, x + 1.6, -1], INK, 1)
+function drawWalls(c: CanvasRenderingContext2D, boards: readonly Board[]) {
+  const walls = new Path2D()
+  for (const { a, b } of boards) {
+    walls.moveTo(a.x, a.y)
+    walls.lineTo(b.x, b.y)
   }
+  const width = WALL_RADIUS * 2
+  c.save()
+  c.lineCap = 'round'
+  c.translate(0, 4)
+  c.strokeStyle = '#2c24422b'
+  c.lineWidth = width + 1
+  c.stroke(walls)
+  c.translate(0, -4)
+  c.strokeStyle = INK
+  c.lineWidth = width
+  c.stroke(walls)
+  c.strokeStyle = '#a79ace'
+  c.lineWidth = width - 5
+  c.stroke(walls)
+  c.translate(0, -1.5)
+  c.strokeStyle = '#e7def7'
+  c.lineWidth = width - 10
+  c.stroke(walls)
   c.restore()
 }
 
@@ -100,30 +97,24 @@ function drawFloor(c: CanvasRenderingContext2D, level: Level) {
   for (let x = 56; x < w; x += 56) {
     for (let y = 56; y < h; y += 56) disc(c, x, y, 1.2, '#a2b4cb59')
   }
-  c.strokeStyle = '#7185a523'
-  c.lineWidth = 2
-  c.strokeRect(12, 12, w - 24, h - 24)
-  for (const [x, y, dx, dy] of [[12, 12, 1, 1], [w - 12, 12, -1, 1], [12, h - 12, 1, -1], [w - 12, h - 12, -1, -1]]) {
-    line(c, [x, y + dy * 22, x, y, x + dx * 22, y], '#8396b67d', 2)
-  }
   const { x, y } = level.player
   c.setLineDash([4, 5])
-  disc(c, x, y, 35, '#b6ceeb30', '#92abd58f')
+  disc(c, x, y, 30, '#b6ceeb30', '#92abd58f')
   c.setLineDash([])
-  label(c, 'START', x, y + 52, 11, '#7088a7', true)
-  level.boards.forEach(b => drawBoard(c, b))
+  label(c, '起点', x, y + 38, 11, '#546f93')
+  drawWalls(c, level.boards)
 }
 
 function drawDoor(c: CanvasRenderingContext2D, p: Vec, time: number) {
   c.save()
   c.translate(p.x, p.y)
-  const glow = c.createRadialGradient(0, 3, 8, 0, 3, 83)
+  const glow = c.createRadialGradient(0, 3, 8, 0, 3, 59)
   glow.addColorStop(0, '#71eea9aa')
   glow.addColorStop(1, '#71eea900')
-  round(c, -83, -80, 166, 166, 70, glow)
+  round(c, -59, -56, 118, 118, 57, glow)
   c.globalAlpha = .36 + Math.sin(time * 4) * .10
   c.setLineDash([3, 5])
-  disc(c, 0, 3, 45, '#d1ffd977', '#238a57', 1.6)
+  disc(c, 0, 1, 40, '#d1ffd977', '#238a57', 1.6)
   c.setLineDash([])
   c.globalAlpha = 1
   round(c, -28, -34, 56, 73, 11, '#21644344')
@@ -131,9 +122,8 @@ function drawDoor(c: CanvasRenderingContext2D, p: Vec, time: number) {
   round(c, -18, -28, 36, 58, 5, '#145443', INK, 2.5)
   round(c, -13, -24, 26, 53, 4, '#b1ffc1')
   line(c, [-6, -6, 6, 3, -6, 12], '#1b8250', 4)
-  round(c, -33, 28, 66, 9, 3, MINT, INK, 2.5)
-  round(c, -26, 45, 52, 20, 6, '#f2fff4', '#357257', 1.5)
-  label(c, '出口', 0, 55, 12, '#225e40')
+  round(c, -30, 28, 60, 15, 4, MINT, INK, 2.5)
+  label(c, '出口', 0, 35, 10, '#225e40')
   for (let i = 0; i < 3; i++) {
     const x = i % 2 ? -41 : 37 + 8 * i
     const y = -23 + i * 17 + Math.sin(time * 2.8 + i) * 7

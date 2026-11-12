@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="theme-color" content="#f8f3eb">
-    <meta name="description" content="小电视大逃亡：捡起电池、释放干扰，躲开弹射的头像，连闯八关。">
+    <meta name="description" content="小电视大逃亡。穿过迷宫，捡起电池，释放干扰，躲开追捕者，连闯八关。">
     <link rel="icon" type="image/svg+xml" href="./tv.svg">
     <title>小电视大逃亡 · TV Escape</title>
   </head>
@@ -20,7 +20,7 @@
           </div>
         </div>
         <div class="roster">
-          <span class="eyebrow roster-label"><span id="roster-count">追捕者 · 1 人</span><span id="roster-speed">140 单位/秒</span></span>
+          <span class="eyebrow roster-label"><span id="roster-count">追捕者 · 1 人</span><span id="roster-speed">126 单位/秒</span></span>
           <div class="roster-list" id="roster"></div>
         </div>
         <div class="controls">
@@ -37,7 +37,7 @@
 
       <div class="frame">
         <div class="arena" id="arena">
-          <canvas id="map" aria-label="游戏地图。WASD 移动，空格干扰追捕者，进入绿色出口。" role="img"></canvas>
+          <canvas id="map" aria-label="迷宫地图。用 WASD 沿通道移动，按空格干扰追捕者，进入绿色出口。" role="img"></canvas>
           <div class="bubble" id="hint" role="status"></div>
           <div class="feedback" id="feedback" aria-live="polite" hidden></div>
           <button class="unlock" id="unlock" type="button" hidden>开启声音</button>
@@ -56,7 +56,7 @@
       <footer class="footer">
         <div class="brand">
           <img src="./tv.svg" alt="" width="43" height="43">
-          <div><div class="eyebrow">TV ESCAPE <span> / </span> 弹射追逐</div><h1 id="game-title">小电视大逃亡</h1></div>
+          <div><div class="eyebrow">TV ESCAPE <span> / </span> 迷宫追逐</div><h1 id="game-title">小电视大逃亡</h1></div>
         </div>
         <button class="power" id="pulse" type="button" aria-label="干扰脉冲（空格）" aria-disabled="true" aria-keyshortcuts="Space"
           aria-describedby="power-count" title="击退附近的追捕者并短暂保护小电视">

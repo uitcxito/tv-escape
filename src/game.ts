@@ -1,6 +1,8 @@
 import { BATTERY_RADIUS, LEVELS, PLAYER_RADIUS, PLAYER_SPEED, ENEMY_RADIUS, EXIT_RADIUS, STEP } from './levels'
 import type { CastId, Level } from './levels'
-import { add, length, meet, move, mul, sub, unit, v } from './physics'
+import { CELL_SIZE, cellAt, mazeDistances } from './maze'
+import type { Maze } from './maze'
+import { add, cast, dot, length, meet, move, mul, sub, unit, v } from './physics'
 import type { Span, Vec } from './physics'
 
 export const MAX_CHARGES = 3
@@ -9,6 +11,8 @@ export const PULSE_DURATION = .56
 const PULSE_SHIELD = .72
 const DISRUPTED_TIME = 1.10
 const DISRUPTED_SPEED = .64
+const REACTION_TIME = .60
+const ARRIVAL_DISTANCE = .01
 
 export type GameEvent =
   | { type: 'catch'; actor: CastId }
@@ -23,6 +27,8 @@ export interface Enemy {
   trail: Vec[]
   delay: number
   disrupted: number
+  waypoint?: Vec
+  reaction: number
 }
 
 const stepTimer = (time: number) => time > STEP + 1e-9 ? time - STEP : 0
@@ -47,7 +53,6 @@ export class Game {
   pulse: { origin: Vec; remaining: number } | null = null
   private trailStep = 0
   private resumeMode: 'ready' | 'running' = 'ready'
-  private firstBounceAt: number | null = null
   private hasPulsed = false
   private pulseHintEnds = 0
 
@@ -67,7 +72,7 @@ export class Game {
     this.enemies = this.level.enemies.map(e => ({
       id: e.id, position: e.position,
       velocity: v(this.level.speed * Math.cos(e.heading), this.level.speed * Math.sin(e.heading)), trail: [],
-      delay: e.delay, disrupted: 0,
+      delay: e.delay, disrupted: 0, reaction: 0,
     }))
   }
 
@@ -88,7 +93,7 @@ export class Game {
 
   restart() {
     this.index = this.attempts = this.time = this.shield = 0
-    this.firstBounceAt = this.lastCaught = null
+    this.lastCaught = null
     this.charge = 1
     this.takenBatteries.clear()
     this.batteriesFound = this.pulseHits = this.pulseHintEnds = 0
@@ -113,11 +118,59 @@ export class Game {
       const direction = distance > 0 ? mul(offset, 1 / distance) : v(this.facing, 0)
       enemy.velocity = mul(direction, this.level.speed)
       enemy.disrupted = DISRUPTED_TIME
+      enemy.waypoint = undefined
       enemy.trail.length = 0
       hits++
     }
     this.pulseHits += hits
     return hits
+  }
+
+  private nextWaypoint(enemy: Enemy, maze: Maze, player: Vec, arrived: boolean) {
+    const offset = sub(player, enemy.position)
+    if (length(offset) <= (maze.chaseRange + .5) * CELL_SIZE &&
+        !cast(enemy.position, offset, ENEMY_RADIUS, this.level)) return player
+
+    const index = cellAt(maze, enemy.position)
+    const cell = maze.cells[index]
+    const distance = mazeDistances(maze, cellAt(maze, player), maze.chaseRange)
+    if (distance[index] === 0 && length(sub(cell.center, enemy.position)) > ARRIVAL_DISTANCE) return cell.center
+
+    let next = cell.neighbors.find(id => distance[id] >= 0 && distance[id] < distance[index])
+    if (next === undefined) {
+      if (!arrived) return
+      // Out of range: keep moving along the corridor, reversing at a dead end.
+      let alignment = -Infinity
+      for (const id of cell.neighbors) {
+        const score = dot(enemy.velocity, sub(maze.cells[id].center, cell.center))
+        if (score <= alignment) continue
+        alignment = score
+        next = id
+      }
+    }
+    const goal = next === undefined ? cell.center : maze.cells[next].center
+    // After a pulse or a sighting in mid-corridor, the next doorway may need
+    // an approach through the center before the chaser can make the turn.
+    return cast(enemy.position, sub(goal, enemy.position), ENEMY_RADIUS, this.level) ? cell.center : goal
+  }
+
+  private moveEnemy(enemy: Enemy, player: Vec) {
+    if (enemy.delay > 0) return
+    if (enemy.disrupted > 0) {
+      return move(enemy.position, mul(enemy.velocity, DISRUPTED_SPEED), STEP, ENEMY_RADIUS, this.level, null)
+    }
+    const maze = this.level.maze
+    if (!maze) return move(enemy.position, enemy.velocity, STEP, ENEMY_RADIUS, this.level, player)
+
+    enemy.reaction = stepTimer(enemy.reaction)
+    const arrived = !enemy.waypoint || length(sub(enemy.waypoint, enemy.position)) <= ARRIVAL_DISTANCE
+    if (arrived || !enemy.reaction) {
+      enemy.waypoint = this.nextWaypoint(enemy, maze, player, arrived) ?? enemy.waypoint
+      enemy.reaction = REACTION_TIME
+    }
+    const offset = sub(enemy.waypoint ?? enemy.position, enemy.position)
+    const speed = Math.min(this.level.speed, length(offset) / STEP)
+    return move(enemy.position, mul(unit(offset), speed), STEP, ENEMY_RADIUS, this.level, null)
   }
 
   private collectBatteries(path: Span[], until: number): GameEvent | undefined {
@@ -148,12 +201,7 @@ export class Game {
     if (input.x) this.facing = Math.sign(input.x)
     const player = move(this.player, mul(unit(input), PLAYER_SPEED), dt, PLAYER_RADIUS, this.level)
     const escape = meet(player.path, [stationary(this.level.exit)], EXIT_RADIUS)
-    const enemies = this.enemies.map(e => {
-      if (e.delay > 0) return
-      const disrupted = e.disrupted > 0
-      return move(e.position, disrupted ? mul(e.velocity, DISRUPTED_SPEED) : e.velocity, dt,
-        ENEMY_RADIUS, this.level, disrupted ? null : player.position)
-    })
+    const enemies = this.enemies.map(e => this.moveEnemy(e, player.position))
     // If immunity ends mid-tick, only test the unprotected portion of the paths.
     const vulnerable = active < dt ? player.path.flatMap(s => {
       if (s.end < active) return []
@@ -215,11 +263,9 @@ export class Game {
       e.position = m.position
       e.velocity = e.disrupted > 0 ? mul(m.velocity, 1 / DISRUPTED_SPEED) : m.velocity
       e.disrupted = stepTimer(e.disrupted)
+      if (m.bounces) e.waypoint = undefined
     })
-    if (this.hint === 'dodge') {
-      if (this.firstBounceAt === null && enemies.some(m => m?.bounces)) this.firstBounceAt = this.time
-      if (this.firstBounceAt !== null && this.moving && this.time - this.firstBounceAt > .85) this.hint = 'exit'
-    }
+    if (this.hint === 'dodge' && this.moving && this.time > 1.65) this.hint = 'exit'
     return pickup
   }
 }

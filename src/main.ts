@@ -25,7 +25,7 @@ const down = new Set<string>()
 const movement = new Set(['KeyW', 'KeyA', 'KeyS', 'KeyD'])
 const hints: Record<NonNullable<Hint>, string> = {
   move: '<kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> 移动',
-  dodge: '躲开头像，注意反弹',
+  dodge: '注意路口，追捕者会转弯',
   exit: '进入绿门过关',
   pulse: '<kbd>空格</kbd> 释放干扰<br>捡电池可补充',
 }
