@@ -138,10 +138,7 @@ export class Sound {
 
   resetGameplayMusic() {
     this.gameplayStarted = false
-    if (!this.music) return
-    this.music.stop()
-    this.music.disconnect()
-    this.music = undefined
+    this.stopMusic()
   }
 
   effect(kind: keyof typeof EFFECTS) {
@@ -177,6 +174,13 @@ export class Sound {
     this.music = source
   }
 
+  private stopMusic() {
+    if (!this.music) return
+    this.music.stop()
+    this.music.disconnect()
+    this.music = undefined
+  }
+
   private setMusicVolume(value: number, duration: number) {
     if (!this.context || !this.musicGain) return
     const time = this.context.currentTime
@@ -191,6 +195,9 @@ export class Sound {
   }
 
   caught(actor: CastId) {
+    this.stopMusic()
+    this.startMusic()
+
     const ctx = this.context
     const buffer = this.buffers[actor] ?? this.buffers.hit
     if (ctx?.state !== 'running' || !buffer || !this.master || this.muted) return

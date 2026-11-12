@@ -31,9 +31,9 @@ npm run preview
 
 碰撞时，最先接触小电视的角色会触发自己的音效、普通话合成配音和字幕。录音位于 [`public/voices/`](public/voices)，字幕为游戏台词。
 
-背景原曲仍需单独接入。取得可使用的 MC Hammer 原曲后，保留原有格式，按 [音频目录说明](public/audio/README.md)放入 `public/audio/` 并重新加载页面。生产包需重新构建。Audio.com 候选的下载入口要求登录。Qobuz 商店列出时长 4:16 的 1990 年 Capitol Records 录音。[Audio.com 候选](https://audio.com/josh-hamilton/audio/mc-hammer-u-can-t-touch-this-kc10122018) · [Qobuz 原专辑](https://www.qobuz.com/us-en/album/please-hammer-dont-hurt-em-mc-hammer/jfhc5esybkfqb)
+本机已安装 MC Hammer 的完整原曲《U Can't Touch This》，时长 4:17，文件在 `public/audio/music.mp3`。换电脑或重新克隆项目时，按 [音频目录说明](public/audio/README.md)放入本地文件。
 
-第一次按 WASD 或点击顶部的“开启声音”会启用声音。按 WASD 开始追逐后，背景原曲从头循环播放。点“再玩一次”后，下次开跑会重新从曲首播放。角色配音在被追上时播放。如果浏览器阻止播放，可点地图右下角的“开启声音”重试。音量和文件路径在 `src/audio.ts`，关卡和台词在 `src/levels.ts`。
+第一次按 WASD 或点击顶部的“开启声音”会启用声音。按 WASD 开始追逐后，背景原曲从头循环播放。每次被追上复活，音乐从曲首重新播放，角色配音期间会压低背景音。点“再玩一次”后，下次开跑会重新从曲首播放。如果浏览器阻止播放，可点地图右下角的“开启声音”重试。音量和文件路径在 `src/audio.ts`，关卡和台词在 `src/levels.ts`。
 
 ## 验证
 
@@ -50,4 +50,4 @@ npm run build
 python tests/browser.py
 ```
 
-可用 `GAME_URL` 指定其他地址，用 `PLAYWRIGHT_CHROMIUM_EXECUTABLE` 指向已有的 Chromium。脚本只用 WASD 走完八关，并单独测试拾取电池、释放干扰、暂停和重试。配音测试检查三条指定台词是否匹配实际播放文件。混音测试用临时 WAV 信号验证循环、短句替换、背景压低与恢复、静音，以及加载或播放被阻止时的表现。
+可用 `GAME_URL` 指定其他地址，用 `PLAYWRIGHT_CHROMIUM_EXECUTABLE` 指向已有的 Chromium。脚本只用 WASD 走完八关，并单独测试拾取电池、释放干扰、暂停和重试。配音测试检查三条指定台词是否匹配实际播放文件。混音测试用临时 WAV 信号验证循环、复活后从曲首重播、短句替换、背景压低与恢复、静音，以及加载或播放被阻止时的表现。

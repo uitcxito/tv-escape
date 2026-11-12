@@ -43,7 +43,8 @@ AUDIO_PROBE = """
       const source = super.createBufferSource();
       const start = source.start.bind(source), stop = source.stop.bind(source);
       source.start = (...args) => {
-        audioProbe.starts.push({ loop: source.loop, time: this.currentTime, duration: source.buffer.duration });
+        audioProbe.starts.push({ loop: source.loop, time: this.currentTime, duration: source.buffer.duration,
+          offset: args[1] ?? 0 });
         return start(...args);
       };
       source.stop = (...args) => {
@@ -308,10 +309,14 @@ def sound_and_retries(browser):
     assert music > -42, music
     frames(page, ROUTES["catch"][0][1])
     expect(page.locator("#feedback")).to_contain_text("重新出发 · 1")
-    page.wait_for_function("audioProbe.starts.length === 2 && audioProbe.spectrum()?.[1] > -40", polling=25)
+    page.wait_for_function("audioProbe.starts.length === 3 && audioProbe.spectrum()?.[1] > -40", polling=25)
+    assert page.evaluate("audioProbe.starts.filter(s => s.loop).map(s => s.offset)") == [0, 0]
+    assert page.evaluate("audioProbe.stops.filter(s => s.loop).length") == 1
     page.wait_for_function(f"audioProbe.spectrum()?.[0] < {music - 8}", polling=25)
     frames(page, ROUTES["catch"][0][1])
     expect(page.locator("#feedback")).to_contain_text("重新出发 · 2")
+    assert page.evaluate("audioProbe.starts.filter(s => s.loop).map(s => s.offset)") == [0, 0, 0]
+    assert page.evaluate("audioProbe.stops.filter(s => s.loop).length") == 2
     assert page.evaluate("audioProbe.starts.filter(s => !s.loop).length") == 2
     assert page.evaluate("audioProbe.stops.filter(s => !s.loop).length") == 1
     stage(page, 1)
@@ -324,7 +329,7 @@ def sound_and_retries(browser):
     page.wait_for_function("audioProbe.spectrum()?.[0] > -42", polling=25)
     assert not errors, errors
     page.close()
-    print("Browser: denied audio activation/retry, repeated catches, loop, duck, voice replacement, restore and mute")
+    print("Browser: activation retry, looping music restarts on each catch, voice replacement, ducking and mute")
 
 
 def batteries_and_pulse(browser):
