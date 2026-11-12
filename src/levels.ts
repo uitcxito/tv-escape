@@ -1,4 +1,4 @@
-import { buildMaze } from './maze'
+import { buildMaze, cellAt, loopLayout, mazeDistances } from './maze'
 import type { Maze } from './maze'
 import type { Arena, Vec } from './physics'
 
@@ -38,7 +38,7 @@ type CastSpawn = [id: CastId, heading: number, delay?: number]
 
 function level(title: string, speed: number, chaseRange: number, cast: readonly CastSpawn[],
   layout: readonly string[]): Level {
-  const { maze, boards, markers } = buildMaze(layout, chaseRange)
+  const { maze, boards, markers } = buildMaze(loopLayout(layout), chaseRange + 2)
   const position = (mark: string) => {
     const point = markers.get(mark)?.[0]
     if (!point) throw new Error(`${title} has no maze marker ${mark}`)
@@ -46,9 +46,28 @@ function level(title: string, speed: number, chaseRange: number, cast: readonly 
   }
   const enemies = cast.map(([id, heading, delay = 0], i) =>
     ({ id, position: position(String(i + 1)), heading: heading * Math.PI / 180, delay }))
+  const start = mazeDistances(maze, cellAt(maze, position('S')))
+  const end = mazeDistances(maze, cellAt(maze, position('E')))
+  const direct = start[cellAt(maze, position('E'))]
+  const patrols = enemies.map(enemy => mazeDistances(maze, cellAt(maze, enemy.position)))
+  const occupied = new Set(['S', 'E', ...cast.map((_, i) => String(i + 1))]
+    .map(mark => cellAt(maze, position(mark))))
+  const candidates = maze.cells.map((cell, index) => ({ cell, index,
+    detour: start[index] + end[index] - direct,
+    guard: Math.min(...patrols.map(distances => distances[index])),
+  })).filter(p => !occupied.has(p.index) && start[p.index] >= 3 && p.guard >= 1)
+    .sort((a, b) => (Number(b.detour > 0) - Number(a.detour > 0)) * 100
+      + (Math.abs(a.guard - 2) - Math.abs(b.guard - 2)) * 10
+      + b.cell.neighbors.length - a.cell.neighbors.length)
+  const batteries: Vec[] = []
+  for (const candidate of candidates) {
+    if (batteries.some(point => mazeDistances(maze, cellAt(maze, point))[candidate.index] < 4)) continue
+    batteries.push(candidate.cell.center)
+    if (batteries.length === (markers.get('*')?.length ?? 0)) break
+  }
   return {
     ...WORLD, title, speed, maze, boards, enemies, player: position('S'), exit: position('E'),
-    batteries: markers.get('*') ?? [],
+    batteries,
   }
 }
 

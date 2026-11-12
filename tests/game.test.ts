@@ -283,3 +283,18 @@ test('a chaser turns before hitting a wall and follows the passage around it', (
   assert.ok(wentAround)
   assert.equal(game.attempts, 1)
 })
+
+test('chase maps have no dead ends and pickups offer separated escape routes', () => {
+  for (const level of LEVELS) {
+    const maze = level.maze!
+    assert.ok(maze.cells.every(cell => cell.neighbors.length >= 2))
+    assert.equal(level.batteries.length, level === LEVELS[0] ? 1 : 2)
+    const start = mazeDistances(maze, cellAt(maze, level.player))
+    for (const battery of level.batteries) {
+      const index = cellAt(maze, battery)
+      assert.ok(start[index] >= 3)
+      assert.ok(maze.cells[index].neighbors.length >= 2)
+      assert.ok(level.enemies.every(enemy => cellAt(maze, enemy.position) !== index))
+    }
+  }
+})

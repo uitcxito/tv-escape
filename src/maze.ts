@@ -15,6 +15,30 @@ export interface Maze {
   chaseRange: number
 }
 
+// Open a second door from every cul-de-sac. Prefer joining another narrow
+// passage so the extra doors form loops without erasing the corridor layout.
+export function loopLayout(layout: readonly string[]) {
+  const grid = layout.map(row => row.split(''))
+  const columns = (grid[0].length - 1) / 4
+  const rows = (grid.length - 1) / 2
+  const doors = (x: number, y: number) => [
+    { x: x + 1, y, gx: 4 * x + 4, gy: 2 * y + 1 },
+    { x, y: y + 1, gx: 4 * x + 2, gy: 2 * y + 2 },
+    { x: x - 1, y, gx: 4 * x, gy: 2 * y + 1 },
+    { x, y: y - 1, gx: 4 * x + 2, gy: 2 * y },
+  ].filter(d => d.x >= 0 && d.x < columns && d.y >= 0 && d.y < rows)
+  const degree = (x: number, y: number) => doors(x, y).filter(d => grid[d.gy][d.gx] === ' ').length
+  for (let y = 0; y < rows; y++) for (let x = 0; x < columns; x++) {
+    if (degree(x, y) >= 2) continue
+    const door = doors(x, y).filter(d => grid[d.gy][d.gx] !== ' ')
+      .sort((a, b) => degree(a.x, a.y) - degree(b.x, b.y))[0]
+    if (door.gy % 2 === 0) {
+      for (let dx = -1; dx <= 1; dx++) grid[door.gy][door.gx + dx] = ' '
+    } else grid[door.gy][door.gx] = ' '
+  }
+  return grid.map(row => row.join(''))
+}
+
 // A space between cells is a doorway. The same boundaries define the
 // navigation links and the collision walls, including closed junctions.
 export function buildMaze(layout: readonly string[], chaseRange: number) {
